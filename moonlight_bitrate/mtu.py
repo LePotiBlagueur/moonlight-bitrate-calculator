@@ -22,6 +22,10 @@ IPV4_HEADER = 20
 IPV6_HEADER = 40
 UDP_HEADER = 8
 ICMP_HEADER = 8
+# En-tête propre au flux Sunshine/Moonlight, à retrancher en plus des
+# en-têtes IP et UDP. La documentation de Sunshine donne :
+#   taille UDP max = MTU - 28 ; packetsize = taille UDP max - 16
+SUNSHINE_HEADER = 16
 
 # Encapsulation WireGuard : en-tête IP + UDP + 32 octets de protocole.
 WG_OVERHEAD_V4 = IPV4_HEADER + UDP_HEADER + 32  # 60
@@ -163,7 +167,7 @@ def discover(host: str, port: int = 5201, windows: bool | None = None,
 class MtuAdvice:
     mtu: int
     datagram_len: int        # pour bench.datagram_len (iperf3 -l)
-    sunshine_packet_size: int
+    sunshine_packetsize: int  # option « packetsize » de Sunshine
     wireguard_mtu: int       # si CE chemin est le transport du tunnel
     through_tunnel: bool
 
@@ -182,7 +186,7 @@ def advise(mtu: int, through_tunnel: bool = True,
     return MtuAdvice(
         mtu=mtu,
         datagram_len=payload,
-        sunshine_packet_size=payload,
+        sunshine_packetsize=payload - SUNSHINE_HEADER,
         wireguard_mtu=(mtu if through_tunnel else mtu - overhead),
         through_tunnel=through_tunnel,
     )

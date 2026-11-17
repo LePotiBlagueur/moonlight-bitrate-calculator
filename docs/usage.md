@@ -18,8 +18,8 @@ Mesure le lien, affiche la matrice résolutions × fps et la recommandation.
 moonlight-bitrate -c config.toml -p vpn --probe-mtu
 ```
 
-Instantané. Donne `bench.datagram_len`, le `packet_size` à mettre dans
-Sunshine, et la MTU WireGuard. Ajoutez `--underlay` si le chemin sondé
+Instantané. Donne `bench.datagram_len`, l'option `packetsize` à mettre dans
+Sunshine (`MTU − 28 − 16`), et la MTU WireGuard. Ajoutez `--underlay` si le chemin sondé
 *transporte* le tunnel au lieu d'être dedans.
 
 ## Mesurer une fois, décider plusieurs fois

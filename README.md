@@ -151,7 +151,7 @@ moonlight-bitrate -c config.toml -p vpn --probe-mtu
   Mesure                 │ Octets        Réglage              │ Valeur
   ───────────────────────┼───────        ─────────────────────┼───────
   MTU du chemin (ICMP)   │      —        bench.datagram_len   │   1332
-  MTU de la route locale │   1360        Sunshine packet_size │   1332
+  MTU de la route locale │   1360        Sunshine packetsize  │   1316
   Méthode retenue        │  route        MTU WireGuard        │   1360
 ```
 
@@ -170,8 +170,11 @@ indique que le chemin sondé *transporte* le tunnel au lieu d'être dedans :
 l'outil retranche alors les 60 octets d'encapsulation WireGuard pour donner la
 MTU à configurer côté tunnel.
 
-Le `packet_size` de Sunshine se règle sur la même valeur : s'il dépasse ce que
-le tunnel peut porter, chaque trame vidéo se fragmente.
+L'option `packetsize` de Sunshine se calcule sur la même base, avec 16 octets
+de plus à retrancher pour l'en-tête du flux : `MTU − 28 − 16`. S'il dépasse ce
+que le tunnel peut porter, chaque trame vidéo se fragmente. Sunshine la laisse
+à `0` (automatique) par défaut, ce qui convient tant que le client sait
+détecter la MTU — ce n'est pas toujours le cas à travers un VPN.
 
 `mtu_check = false` désactive le contrôle, `mtu_autofit = false` le laisse
 avertir sans corriger.

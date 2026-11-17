@@ -135,3 +135,23 @@ class TestLadderIntegration(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSunshinePacketsize(unittest.TestCase):
+    """`packetsize` = MTU - 28 - 16, d'après la documentation de Sunshine."""
+
+    def test_formula(self):
+        for value, expected in [(1500, 1456), (1420, 1376), (1392, 1348),
+                                (1360, 1316), (1280, 1236)]:
+            with self.subTest(mtu=value):
+                self.assertEqual(advise(value).sunshine_packetsize, expected)
+
+    def test_sixteen_bytes_below_the_datagram_payload(self):
+        a = advise(1360)
+        self.assertEqual(a.datagram_len - a.sunshine_packetsize,
+                         mtu.SUNSHINE_HEADER)
+
+    def test_stays_inside_the_mtu(self):
+        for value in (1500, 1420, 1360, 1280, 576):
+            a = advise(value)
+            self.assertTrue(fits(a.sunshine_packetsize, value))

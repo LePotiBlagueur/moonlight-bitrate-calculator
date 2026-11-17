@@ -18,6 +18,12 @@ Deux méthodes, parce qu'aucune ne suffit seule :
 
 Quand les deux répondent, la plus basse s'applique.
 
+Les réglages en découlent : `bench.datagram_len` vaut `MTU − 28` (en-têtes IP
+et UDP), et l'option `packetsize` de Sunshine `MTU − 28 − 16`, les 16 octets
+supplémentaires étant l'en-tête du flux. Sunshine la laisse à `0`
+(automatique) par défaut ; la fixer n'est utile que quand le client ne détecte
+pas correctement la MTU, ce qui arrive à travers un VPN.
+
 ## 2. Le sens de la mesure
 
 Le flux vidéo va de l'hôte vers le client. La mesure utilise donc `-R`

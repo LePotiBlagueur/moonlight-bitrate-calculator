@@ -125,15 +125,16 @@ def mtu_report(result, advice, log: "Logger") -> None:
 
     if advice is None:
         log.error("MTU indéterminée : gardez une valeur basse "
-                  "(datagram_len = 1252, MTU WireGuard = 1280).")
+                  "(datagram_len = 1252, packetsize = 1236, "
+                  "MTU WireGuard = 1280).")
         return
 
     print()
     rows = [
         ["bench.datagram_len", f"{advice.datagram_len}",
          "taille des datagrammes de mesure"],
-        ["Sunshine packet_size", f"{advice.sunshine_packet_size}",
-         "à aligner dans la config de Sunshine"],
+        ["Sunshine packetsize", f"{advice.sunshine_packetsize}",
+         "option « packetsize » de Sunshine (MTU - 28 - 16)"],
         ["MTU WireGuard", f"{advice.wireguard_mtu}",
          "si ce chemin EST le tunnel" if advice.through_tunnel
          else "si ce chemin TRANSPORTE le tunnel"],
