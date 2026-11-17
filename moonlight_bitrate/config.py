@@ -33,7 +33,9 @@ class HostConfig:
     """Hôte Sunshine distant (celui qui encode et envoie la vidéo)."""
 
     host: str = "192.168.1.10"
-    user: str = "falaa"
+    # Nom de COMPTE Windows, pas le dossier de profil : les deux diffèrent
+    # souvent, et sshd rejette un nom inconnu avant même de lire une clé.
+    user: str = "kwak"
     port: int = 22
     key_path: str = "~/.ssh/id_moonlight"
     # Chemin d'iperf3 sur la machine distante (Windows : chemin absolu).

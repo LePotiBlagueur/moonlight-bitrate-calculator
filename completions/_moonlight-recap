@@ -1,0 +1,62 @@
+#compdef moonlight-recap
+# Complétion zsh pour moonlight-recap.
+
+_moonlight_profiles() {
+  local config i
+  for (( i = 1; i < CURRENT; i++ )); do
+    case ${words[i]} in
+      -c|--config) config=${words[i+1]} ;;
+      --config=*)  config=${words[i]#*=} ;;
+    esac
+  done
+  [[ -z $config && -f ./config.toml ]] && config=./config.toml
+  [[ -f ${~config} ]] || return 1
+  local -a names
+  names=(${(f)"$(sed -n 's/^\[profiles\.\([A-Za-z0-9_-]*\).*/\1/p' ${~config} | sort -u)"})
+  (( ${#names} )) && _describe -t profiles 'profil' names
+}
+
+_arguments -s -S \
+  '(- *)--version[afficher la version]' \
+  '(-h --help)'{-h,--help}'[afficher l'\''aide]' \
+  '(-c --config)'{-c,--config}'[fichier de configuration TOML]:fichier:_files -g "*.toml"' \
+  '(-p --profile)'{-p,--profile}'[profil à appliquer]:profil:_moonlight_profiles' \
+  '(--budget --load --measure)'{-b,--bandwidth}'[capacité UDP propre connue en Mbps]:mbps:' \
+  '(-b --bandwidth --load --measure)--budget[budget réseau déjà net de marge]:mbps:' \
+  '(-b --bandwidth --budget --measure)--load[mesures enregistrées]:fichier:_files -g "*.json"' \
+  '(-b --bandwidth --budget --load)--measure[lancer la mesure maintenant]' \
+  '--save[enregistrer les mesures brutes]:fichier:_files -g "*.json"' \
+  '--host[hôte Sunshine]:hôte:_hosts' \
+  '--user[compte SSH]:utilisateur:' \
+  '--ssh-port[port SSH]:port:' \
+  '--key[clé privée SSH]:fichier:_files' \
+  '--remote-iperf[chemin d'\''iperf3 sur l'\''hôte]:chemin:' \
+  '--remote-os[système de l'\''hôte]:système:(windows unix)' \
+  '--iperf-port[port du serveur iperf3]:port:' \
+  '--no-ssh[iperf3 -s déjà lancé en face]' \
+  '--local-iperf[chemin d'\''iperf3 en local]:fichier:_files' \
+  '--direction[sens mesuré]:sens:(download upload both)' \
+  '(-t --duration)'{-t,--duration}'[durée d'\''un palier en secondes]:secondes:' \
+  '--streams[flux UDP parallèles]:nombre:' \
+  '--length[taille des datagrammes UDP]:octets:' \
+  '--no-tcp-probe[sauter la sonde TCP]' \
+  '--ceiling[plafond supposé en Mbps]:mbps:' \
+  '--max-loss[perte maximale tolérée en %]:pourcent:' \
+  '--max-jitter[gigue maximale tolérée en ms]:ms:' \
+  '--no-ping[sauter la sonde ICMP]' \
+  '--no-mtu-check[ne pas vérifier la MTU]' \
+  '--codec[codec du flux]:codec:(h264 hevc av1)' \
+  '--quality[préréglage de qualité]:préréglage:(saver balanced high max)' \
+  '--yuv444[flux 4:4:4]' \
+  '--hdr[flux HDR]' \
+  '--fec[surcoût FEC]:ratio:' \
+  '--audio[débit audio réservé en Mbps]:mbps:' \
+  '--safety[marge de sécurité]:ratio:' \
+  '*--resolution[résolution à inclure]:résolution:(1280x720 1920x1080 1920x1200 2560x1440 2560x1600 3440x1440 3840x2160)' \
+  '*--fps[fréquence à inclure]:fps:(60 90 100 120 144 165 240)' \
+  '(-f --format)'{-f,--format}'[format de sortie]:format:(table markdown csv html json)' \
+  '(-o --out)'{-o,--out}'[écrire dans un fichier]:fichier:_files' \
+  '--sections[sections à inclure]:sections:(all network matrix codecs quality best)' \
+  '(-v --verbose)'{-v,--verbose}'[journal détaillé]' \
+  '--no-color[sans couleurs]' \
+  '--pause[attendre une touche avant de fermer]'

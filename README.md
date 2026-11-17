@@ -25,21 +25,18 @@ théorique.
 
 ## Installation
 
-Sur **les deux machines** : [iperf3](https://iperf.fr/iperf-download.php) ≥ 3.7.
-
-Sur la machine cliente (celle qui lance l'outil) :
-
 ```bash
-python -m venv .venv && . .venv/bin/activate   # .venv\Scripts\activate sous Windows
-pip install -e .
+./install.sh
 ```
 
-Accès SSH par clé vers l'hôte (sinon utilisez `--no-ssh`) :
+Installe les deux commandes dans votre `PATH` via **pipx** (environnement
+isolé, pas de `paramiko` global), ajoute `~/.local/bin` au `PATH` si besoin et
+pose les complétions zsh. Idempotent, et réversible par `./install.sh
+--uninstall`.
 
-```bash
-ssh-keygen -t ed25519 -f ~/.ssh/id_moonlight
-ssh-copy-id -i ~/.ssh/id_moonlight.pub falaa@192.168.1.10
-```
+Prérequis : Python ≥ 3.11, `pipx`, et `iperf3` **sur les deux machines**.
+Détails, variantes sans installation et mise en place de la clé SSH :
+[docs/install.md](docs/install.md).
 
 ## Utilisation
 
@@ -57,7 +54,7 @@ Quelques variantes :
 
 ```bash
 # Tout en ligne de commande, sans fichier de config
-moonlight-bitrate --host 192.168.1.10 --user falaa --codec av1 --quality high
+moonlight-bitrate --host 192.168.1.10 --user kwak --codec av1 --quality high
 
 # Seulement vos deux modes de jeu, mesure rapide
 moonlight-bitrate -c config.toml --resolution 1920x1200 --resolution 2560x1440 \
@@ -282,115 +279,36 @@ PyInstaller ne sait pas produire un `.exe` depuis un Python Linux : le script
 installe un vrai Python Windows dans un préfixe wine (`.wine-build/`) puis y
 exécute PyInstaller. Comptez ~400 Mo de téléchargement la première fois.
 
-## Comment le chiffre est obtenu
+## Pour aller plus loin
 
-1. **Sonde TCP** (facultative) pour cadrer la recherche, puis **paliers UDP**
-   croissants : 25 %, 40 %, 55 %… du plafond estimé.
-2. Un palier est « propre » si perte ≤ `max_loss_pct` **et** gigue ≤
-   `max_jitter_ms` **et** si l'émetteur a bien généré le débit demandé.
-3. **Dichotomie** entre le dernier palier propre et le premier en échec
-   (3 itérations, arrêt à 4 % d'écart).
-4. Budget réseau = capacité propre × `safety_margin` (0,85 par défaut).
-5. Débit vidéo max = (budget − audio) ÷ (1 + FEC) — Sunshine ajoute ~20 % de
-   FEC par-dessus la vidéo, et l'audio Opus passe dans le même tuyau.
-6. Besoin de chaque mode = référence Moonlight × facteur qualité × efficacité du
-   codec, puis comparaison au budget.
+| Document | Contenu |
+|---|---|
+| [docs/usage.md](docs/usage.md) | Recettes de ligne de commande, codes de sortie. |
+| [docs/configuration.md](docs/configuration.md) | Référence de toutes les clés TOML. |
+| [docs/architecture.md](docs/architecture.md) | Comment la mesure et le calcul fonctionnent, et pourquoi. |
+| [docs/troubleshooting.md](docs/troubleshooting.md) | SSH sous Windows, émetteur qui plafonne, perte erratique, vieux iperf3. |
+| [docs/install.md](docs/install.md) | Installation, complétions, désinstallation. |
 
-La référence Moonlight est sa propre formule : table de facteurs par nombre de
-pixels (360p→1, 480p→2, 720p→5, 1080p→10, 1440p→20, 2160p→40) interpolée
-linéairement, multipliée par `fps/30` jusqu'à 60 fps puis `√(fps/60)×60/30`
-au-delà. D'où 1080p60 = 20 Mbps, 1440p60 = 40 Mbps, 4K60 = 80 Mbps.
-
-Efficacité codec appliquée au besoin : H.264 ×1.00, HEVC ×0.75, AV1 ×0.65.
-Préréglages qualité : `saver` ×0.75, `balanced` ×1.00, `high` ×1.25, `max` ×1.50.
-
-## Dépannage SSH sous Windows
-
-Trois pièges, tous rencontrés sur une vraie installation, qui produisent le même
+Les trois pièges SSH de Windows — nom de compte distinct du dossier de profil,
+`authorized_keys` en dossier plutôt qu'en fichier, et
+`administrators_authorized_keys` pour les comptes administrateur — sont tous
+documentés dans la page de dépannage. Ils produisent le même
 `Permission denied (publickey)` trompeur.
-
-**1. Le nom de compte n'est pas le dossier de profil.** `C:\Users\falaa` peut
-très bien appartenir au compte `kwak`. Un mauvais nom d'utilisateur est rejeté
-*avant* toute vérification de clé, ce qui ressemble à s'y méprendre à un
-problème de clé. Le journal tranche :
-
-```powershell
-Get-WinEvent -LogName "OpenSSH/Operational" -MaxEvents 10 |
-  Select-Object TimeCreated, Message | Format-List
-```
-
-`Invalid user <nom>` = mauvais compte. Le bon nom vient de `whoami` sur l'hôte,
-ou de `Get-LocalUser` (colonne `Enabled`).
-
-**2. `authorized_keys` doit être un fichier, pas un dossier.** Un répertoire du
-même nom contenant des `.pub` n'est jamais lu.
-
-**3. Pour un compte administrateur, sshd ignore `~/.ssh/authorized_keys`** et ne
-lit que `C:\ProgramData\ssh\administrators_authorized_keys` (règle
-`Match Group administrators` de `sshd_config`). En console élevée :
-
-```powershell
-$k = Get-Content C:\Users\<profil>\.ssh\authorized_keys -Raw
-Set-Content -Path C:\ProgramData\ssh\administrators_authorized_keys `
-            -Value $k -Encoding ascii
-icacls C:\ProgramData\ssh\administrators_authorized_keys /inheritance:r `
-       /grant *S-1-5-32-544:F /grant *S-1-5-18:F
-```
-
-`Set-Content` écrit dans le fichier existant, là où `Copy-Item` le remplace et
-échoue sur les ACL. Les SID évitent les noms de groupes localisés. N'écrivez
-jamais ce fichier avec `>` ou `Out-File` : PowerShell 5.1 produit de l'UTF-16 et
-sshd ne lit plus rien.
-
-## Version d'iperf3 sur l'hôte
-
-L'outil interroge `iperf3 --version` au démarrage et prévient si le build est
-ancien. Les binaires Windows qui traînent depuis des années sont souvent en
-**3.1.4 (Cygwin, 2016)** : le cadencement de `-b` y est grossier et les flux UDP
-parallèles (`-P`) rendent une sortie vide. La capacité mesurée reste exploitable
-mais pessimiste. Une 3.7+ depuis [iperf.fr](https://iperf.fr/iperf-download.php)
-change nettement la précision.
-
-## Si l'outil annonce « émetteur saturé »
-
-iperf3 compilé sous Cygwin (les binaires Windows) plafonne souvent bien avant
-le lien en UDP. Dans ce cas la capacité affichée est un **plancher**. Remèdes :
-
-```toml
-[bench]
-streams = 4           # répartir sur plusieurs flux
-datagram_len = 8900   # trames jumbo si le réseau les accepte
-```
 
 ## Développement
 
 ```bash
-python -m unittest discover -s tests -v
+python -m venv .venv && . .venv/bin/activate
+pip install -e .
+python -m unittest discover -s . -p 'test_*.py' -v
 ```
 
-Les 91 tests couvrent la formule Moonlight (valeurs de référence publiées), le
-parsing des trois formes de JSON UDP d'iperf3, la convergence de la recherche
-par paliers sur un lien simulé, les surcharges des deux CLI, chaque format de
-rendu du récap, la logique de double-clic des exécutables, et la
-détection de version d'iperf3 (calée sur la sortie d'un hôte réel en 3.1.4)
-la superposition des profils et la
-sonde de MTU.
+98 tests, sans accès réseau. Ils couvrent la formule Moonlight calée sur les
+valeurs publiées par le projet, les trois formes de JSON UDP d'iperf3, la
+convergence des paliers sur un lien simulé, la sonde de MTU, la superposition
+des profils, les deux CLI et chaque format de rendu.
 
-## Structure
-
-```
-moonlight_bitrate/
-  config.py   dataclasses, chargement TOML, surcharges
-  remote.py   serveur iperf3 distant par SSH (contexte auto-nettoyant)
-  iperf.py    exécution d'iperf3, parsing JSON robuste, sonde ICMP
-  ladder.py   recherche de la capacité UDP propre (paliers + dichotomie)
-  mtu.py      MTU du chemin (ICMP + route) et réglages déduits
-  model.py    formule Moonlight, FEC/audio, faisabilité par mode
-  report.py   journal console et tableaux
-  cli.py      arguments, orchestration, JSON
-  recap.py    tableaux récapitulatifs et rendus (texte/MD/CSV/HTML/JSON)
-  recap_cli.py  commande `moonlight-recap`
-  entry.py    points d'entrée des .exe (double-clic, config voisine)
-packaging/    spec PyInstaller et scripts de build
-.github/workflows/build-windows.yml   construction des .exe en CI
-```
+Trois garde-fous contre la dérive : toute clé de configuration doit apparaître
+dans la référence, toute option de ligne de commande dans les complétions
+zsh, et tout lien interne de la documentation doit pointer sur un fichier
+existant.
