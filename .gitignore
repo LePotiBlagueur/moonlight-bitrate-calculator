@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+config.toml
+*.local.toml
+mesures*.json
+dist/
+.venv-build/
+.wine-build/
+*.spec.bak
+recap.html
+recap.md

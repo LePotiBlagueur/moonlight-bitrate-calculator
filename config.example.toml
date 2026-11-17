@@ -1,0 +1,77 @@
+# Copiez ce fichier en config.toml et adaptez-le, puis :
+#   python -m moonlight_bitrate.cli -c config.toml
+# Toute option peut aussi être passée en ligne de commande (elle gagne).
+
+verbose = false
+color = true
+pause = false          # true = attendre une touche avant de fermer la fenêtre
+
+[host]
+# L'hôte Sunshine : la machine qui encode et envoie la vidéo.
+host = "192.168.1.10"
+# ATTENTION : c'est le nom de COMPTE Windows, pas le dossier de profil.
+# C:\Users\<dossier> ne correspond pas forcément au compte : vérifiez avec
+# `whoami` sur l'hôte. Un mauvais nom donne « Invalid user » dans les journaux
+# sshd et un « Permission denied » qui fait croire à un problème de clé.
+user = "kwak"
+port = 22
+key_path = "~/.ssh/id_moonlight"
+iperf_path = 'C:\Program Files\iperf3\iperf3.exe'
+remote_os = "windows"  # "windows" ou "unix" (commandes de nettoyage)
+iperf_port = 5201
+no_ssh = false         # true si vous lancez `iperf3 -s` à la main sur l'hôte
+
+[bench]
+# Vide = iperf3 cherché dans le PATH.
+iperf_path = ""
+# "download" = hôte → client, c'est le sens de la vidéo : gardez-le.
+# "both" mesure aussi le retour (manette, micro).
+direction = "download"
+duration = 8           # secondes par palier
+omit = 1               # secondes ignorées en début de palier
+# Montez à 2-4 si l'émetteur plafonne, MAIS seulement avec iperf3 >= 3.2 :
+# les vieux builds Cygwin rendent une sortie vide en UDP avec -P.
+streams = 1
+datagram_len = 1400    # octets, sous la MTU pour éviter la fragmentation
+
+tcp_probe = true       # sonde TCP pour cadrer la recherche UDP
+tcp_duration = 6
+tcp_streams = 4
+assumed_ceiling_mbps = 1000.0   # utilisé seulement si tcp_probe = false
+
+# Paliers UDP testés, en fraction du plafond estimé.
+ladder = [0.25, 0.40, 0.55, 0.70, 0.85, 1.00]
+refine_steps = 3       # dichotomie après le premier palier en échec
+refine_tolerance = 0.04
+
+# Un palier est « propre » en dessous de ces seuils.
+max_loss_pct = 0.15
+max_jitter_ms = 3.0
+sender_limited_ratio = 0.90
+retry_on_fail = true
+
+ping_probe = true
+ping_count = 20
+
+[model]
+codec = "hevc"         # "h264" | "hevc" | "av1"
+quality = "balanced"   # "saver" | "balanced" | "high" | "max"
+yuv444 = false
+hdr = false
+fec_overhead = 0.20    # FEC de Sunshine (20 % par défaut)
+audio_mbps = 0.5       # 0.5 en stéréo, ~1.5 en 5.1/7.1
+safety_margin = 0.85   # part de la capacité propre réellement exploitée
+marginal_tolerance = 0.15
+
+# [nom affiché, largeur, hauteur]
+resolutions = [
+  ["720p",        1280,  720],
+  ["900p",        1600,  900],
+  ["1080p",       1920, 1080],
+  ["1200p 16:10", 1920, 1200],
+  ["1440p",       2560, 1440],
+  ["1600p 16:10", 2560, 1600],
+  ["UW 1440p",    3440, 1440],
+  ["4K",          3840, 2160],
+]
+framerates = [60, 90, 120, 144]
