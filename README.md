@@ -19,7 +19,7 @@ théorique.
 | Formule maison `30 Mbps × ratio de pixels` | Formule **exacte de Moonlight** (table de pixels interpolée, racine carrée au-delà de 60 fps) |
 | Une seule résolution | **Matrice** résolutions × fréquences, verdict par case |
 | Codec ignoré | Efficacité **H.264 / HEVC / AV1** et préréglages de qualité |
-| Script monolithique | Paquet testé (63 tests), config TOML, rejeu hors ligne |
+| Script monolithique | Paquet testé (74 tests), config TOML, rejeu hors ligne |
 | Sortie texte unique | CLI récap dédiée : table, Markdown, CSV, HTML, JSON |
 | À lancer avec Python | Exécutables Windows autonomes (`.exe`) |
 
@@ -45,8 +45,10 @@ ssh-copy-id -i ~/.ssh/id_moonlight.pub falaa@192.168.1.10
 
 ```bash
 cp config.example.toml config.toml   # adaptez l'IP, l'utilisateur, les chemins
-moonlight-bitrate -c config.toml
+moonlight-bitrate -c config.toml -p lan
 ```
+
+`config.example.toml` déclare deux profils, `lan` et `vpn` — voir plus bas.
 
 Sans installation : `python __main__.py -c config.toml`
 (double-clic sous Windows : la fenêtre reste ouverte à la fin).
@@ -93,6 +95,58 @@ moonlight-bitrate --load mesures.json --json       # sortie machine
 ```
 
 `✓` confortable · `~` limite · `✗` hors budget.
+
+## Deux liens, deux profils
+
+Le même hôte se joint de deux façons, et les deux ne se mesurent pas pareil.
+Un profil est une **surcouche** : il ne redéfinit que les clés qu'il cite, tout
+le reste vient des sections de base.
+
+```bash
+moonlight-bitrate -c config.toml -p lan    # réseau local
+moonlight-bitrate -c config.toml -p vpn    # tunnel WireGuard
+moonlight-recap   -c config.toml -p vpn --measure
+```
+
+```toml
+[bench]
+duration = 8
+streams = 1
+
+[profiles.lan.bench]
+datagram_len = 1400
+assumed_ceiling_mbps = 1000.0
+max_jitter_ms = 2.0          # un LAN filaire ne doit pas bouger
+max_loss_pct = 0.10
+
+[profiles.vpn.bench]
+datagram_len = 1380          # voir ci-dessous
+assumed_ceiling_mbps = 300.0
+max_jitter_ms = 8.0
+max_loss_pct = 0.30
+duration = 10                # le débit d'un tunnel est plus erratique
+refine_steps = 4
+ping_probe = false           # l'ICMP ne traverse pas toujours le tunnel
+
+[profiles.vpn.model]
+safety_margin = 0.75         # plus de marge : le lien varie d'une minute à l'autre
+```
+
+**La taille des datagrammes n'est pas un détail.** WireGuard ajoute 60 octets
+d'encapsulation et prend une MTU de 1420 par défaut, soit 1420 − 20 (IP) − 8
+(UDP) = 1392 octets utiles. Un `datagram_len` de 1400 dans le tunnel fait
+fragmenter chaque paquet, et le taux de perte mesuré devient du bruit. 1380
+laisse une marge.
+
+Une option passée en ligne de commande reste prioritaire sur le profil, qui
+est lui-même prioritaire sur les sections de base. Un nom de profil inexistant
+liste ceux qui sont déclarés.
+
+**Ne réglez pas Moonlight sur une mesure VPN.** Le tunnel donne une capacité
+plus basse et beaucoup plus variable : sur l'installation de test, 131 Mbps en
+TCP mais seulement ~45 Mbps propres en UDP, avec un même palier qui passe de
+3 % à 52 % de perte d'un essai à l'autre. Le profil `vpn` sert à savoir ce que
+vous pouvez espérer en déplacement, pas à calibrer le confort à la maison.
 
 ## Tableau récapitulatif — `moonlight-recap`
 
@@ -273,11 +327,12 @@ datagram_len = 8900   # trames jumbo si le réseau les accepte
 python -m unittest discover -s tests -v
 ```
 
-Les 63 tests couvrent la formule Moonlight (valeurs de référence publiées), le
+Les 74 tests couvrent la formule Moonlight (valeurs de référence publiées), le
 parsing des trois formes de JSON UDP d'iperf3, la convergence de la recherche
 par paliers sur un lien simulé, les surcharges des deux CLI, chaque format de
 rendu du récap, la logique de double-clic des exécutables, et la
-détection de version d'iperf3 (calée sur la sortie d'un hôte réel en 3.1.4).
+détection de version d'iperf3 (calée sur la sortie d'un hôte réel en 3.1.4)
+et la superposition des profils.
 
 ## Structure
 

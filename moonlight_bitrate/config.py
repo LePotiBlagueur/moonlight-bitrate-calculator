@@ -110,6 +110,8 @@ class AppConfig:
     verbose: bool = False
     color: bool = True
     pause: bool = False
+    # Nom du profil appliqué par-dessus la configuration de base, s'il y en a un.
+    active_profile: str | None = None
 
     # --- helpers -----------------------------------------------------------
 
@@ -158,23 +160,65 @@ def _apply(section: Any, data: dict[str, Any], path: str) -> None:
             setattr(section, key, value)
 
 
-def load_config(path: str | os.PathLike[str] | None) -> AppConfig:
-    cfg = AppConfig()
-    if path is None:
-        return cfg
+def _apply_layer(cfg: AppConfig, data: dict[str, Any], origin: str) -> None:
+    """Applique une couche de configuration (base, puis profil) sur `cfg`."""
+    for section_name in ("host", "bench", "model"):
+        if section_name in data:
+            _apply(getattr(cfg, section_name), data[section_name],
+                   f"{origin}{section_name}")
+    # Clés racine (verbose, color, pause…)
+    scalars = {k: v for k, v in data.items() if not isinstance(v, dict)}
+    _apply(cfg, scalars, origin.rstrip("."))
+
+
+def _read_toml(path: str | os.PathLike[str]) -> dict[str, Any]:
     file = Path(os.path.expanduser(str(path)))
     if not file.exists():
         raise FileNotFoundError(f"Fichier de configuration introuvable : {file}")
     if tomllib is None:  # pragma: no cover
         raise RuntimeError("tomllib indisponible : Python 3.11+ requis pour --config")
     with file.open("rb") as fh:
-        data = tomllib.load(fh)
+        return tomllib.load(fh)
 
-    for section_name in ("host", "bench", "model"):
-        if section_name in data:
-            _apply(getattr(cfg, section_name), data.pop(section_name), section_name)
-    # Clés racine (verbose, color, pause…)
-    _apply(cfg, {k: v for k, v in data.items() if not isinstance(v, dict)}, "")
+
+def list_profiles(path: str | os.PathLike[str] | None) -> list[str]:
+    """Noms des profils déclarés dans le fichier, triés."""
+    if path is None:
+        return []
+    profiles = _read_toml(path).get("profiles") or {}
+    return sorted(profiles) if isinstance(profiles, dict) else []
+
+
+def load_config(path: str | os.PathLike[str] | None,
+                profile: str | None = None) -> AppConfig:
+    """Charge la configuration, en appliquant éventuellement un profil.
+
+    Un profil est une surcouche : `[profiles.vpn.bench]` ne remplace que les
+    clés qu'il cite, le reste vient de `[bench]`.
+    """
+    cfg = AppConfig()
+    if path is None:
+        if profile:
+            raise ValueError(
+                f"Le profil « {profile} » exige un fichier de configuration (-c)."
+            )
+        return cfg
+
+    data = _read_toml(path)
+    profiles = data.pop("profiles", {}) or {}
+    if not isinstance(profiles, dict):
+        raise ValueError("La section [profiles] doit contenir des sous-tables.")
+
+    _apply_layer(cfg, data, "")
+
+    if profile:
+        if profile not in profiles:
+            available = ", ".join(sorted(profiles)) or "aucun profil déclaré"
+            raise ValueError(
+                f"Profil inconnu : « {profile} ». Disponibles : {available}."
+            )
+        _apply_layer(cfg, profiles[profile], f"profiles.{profile}.")
+        cfg.active_profile = profile
 
     # Les résolutions arrivent en listes TOML : on normalise en tuples.
     cfg.model.resolutions = [

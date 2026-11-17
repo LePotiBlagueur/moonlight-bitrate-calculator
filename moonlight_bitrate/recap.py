@@ -222,6 +222,8 @@ def build_recap(cfg: AppConfig, budget: float, capacity: float,
         ("Codec", CODEC_LABEL.get(m.codec, m.codec)),
         ("Qualité", f"{m.quality} (×{QUALITY_FACTOR.get(m.quality, 1.0):.2f})"),
     ]
+    if cfg.active_profile:
+        meta.insert(1, ("Profil", cfg.active_profile))
     if m.yuv444:
         meta.append(("Chroma", "4:4:4 (×2)"))
     if m.hdr:

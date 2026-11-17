@@ -52,6 +52,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     p.add_argument("-c", "--config", help="Fichier de configuration TOML")
+    p.add_argument("-p", "--profile",
+                   help="Profil [profiles.<nom>] à appliquer par-dessus la config "
+                        "(ex. : lan, vpn)")
 
     g = p.add_argument_group("hôte distant")
     g.add_argument("--host", help="IP ou nom de l'hôte Sunshine")
@@ -182,6 +185,7 @@ def profile_to_dict(profile: NetworkProfile, cfg: AppConfig) -> dict:
         "version": __version__,
         "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "host": cfg.host.host,
+        "profile": cfg.active_profile,
         "bench": asdict(cfg.bench),
         "primary": asdict(profile.primary),
         "secondary": asdict(profile.secondary) if profile.secondary else None,
@@ -225,6 +229,8 @@ def profile_from_dict(data: dict) -> NetworkProfile:
 
 
 def run(cfg: AppConfig, args: argparse.Namespace, log: Logger) -> int:
+    if cfg.active_profile:
+        log.step(f"Profil actif : {cfg.active_profile}")
     if args.load:
         log.step(f"Lecture des mesures enregistrées : {args.load}")
         profile = profile_from_dict(json.loads(Path(args.load).read_text("utf-8")))
@@ -273,7 +279,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        cfg = apply_overrides(load_config(args.config), args)
+        cfg = apply_overrides(load_config(args.config, args.profile), args)
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         print(f"Configuration : {exc}", file=sys.stderr)
         return 2

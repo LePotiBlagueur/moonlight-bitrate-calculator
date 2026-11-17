@@ -51,11 +51,13 @@ def build_parser() -> argparse.ArgumentParser:
                "  moonlight-recap -b 450\n"
                "  moonlight-recap --load mesures.json --format html -o recap.html\n"
                "  moonlight-recap --measure -c config.toml --save mesures.json\n"
-               "  moonlight-recap -b 120 --sections matrix,codecs --format markdown",
+               "  moonlight-recap -c config.toml -p vpn --measure",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     p.add_argument("-c", "--config", help="Fichier de configuration TOML")
+    p.add_argument("-p", "--profile",
+                   help="Profil [profiles.<nom>] à appliquer (ex. : lan, vpn)")
 
     src = p.add_argument_group("source du débit (une seule)")
     g = src.add_mutually_exclusive_group()
@@ -235,7 +237,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        cfg = apply_overrides(load_config(args.config), args)
+        cfg = apply_overrides(load_config(args.config, args.profile), args)
     except (FileNotFoundError, ValueError, RuntimeError) as exc:
         print(f"Configuration : {exc}", file=sys.stderr)
         return 2

@@ -75,3 +75,51 @@ resolutions = [
   ["4K",          3840, 2160],
 ]
 framerates = [60, 90, 120, 144]
+
+# ==========================================================================
+# Profils : surcouches appliquées avec -p/--profile.
+# Une clé non citée garde la valeur des sections ci-dessus.
+#
+#   moonlight-bitrate -c config.toml -p lan
+#   moonlight-recap   -c config.toml -p vpn --measure
+# ==========================================================================
+
+# --- Réseau local -----------------------------------------------------------
+# C'est CE profil qui doit servir à régler Moonlight : il mesure le lien que
+# le streaming empruntera réellement.
+[profiles.lan.host]
+host = "192.168.1.10"
+
+[profiles.lan.bench]
+datagram_len = 1400          # MTU Ethernet 1500 - 20 (IP) - 8 (UDP) - marge
+assumed_ceiling_mbps = 1000.0
+max_jitter_ms = 2.0          # un LAN filaire ne doit pas bouger
+max_loss_pct = 0.10
+
+[profiles.lan.model]
+safety_margin = 0.85
+
+# --- Tunnel WireGuard -------------------------------------------------------
+# Utile pour jouer hors de chez soi, mais à ne pas confondre avec une mesure
+# LAN : la capacité trouvée sera plus basse et beaucoup plus variable.
+[profiles.vpn.host]
+# Adresse de l'hôte telle qu'elle est jointe À TRAVERS le tunnel. Si WireGuard
+# route le LAN distant, c'est la même qu'en local ; s'il n'expose que les
+# adresses du tunnel, mettez celle de l'hôte dans le tunnel (ex. 10.66.119.1).
+host = "192.168.1.10"
+
+[profiles.vpn.bench]
+# WireGuard ajoute 60 octets d'encapsulation (IPv4) et prend une MTU de 1420
+# par défaut : 1420 - 20 (IP) - 8 (UDP) = 1392 utiles. 1380 laisse une marge
+# et évite la fragmentation, qui fausserait complètement le taux de perte.
+datagram_len = 1380
+assumed_ceiling_mbps = 300.0
+max_jitter_ms = 8.0          # la gigue d'un tunnel n'a rien à voir avec un LAN
+max_loss_pct = 0.30
+duration = 10                # paliers plus longs : le débit est plus erratique
+retry_on_fail = true
+refine_steps = 4
+ping_count = 30
+
+[profiles.vpn.model]
+safety_margin = 0.75         # plus de marge : le lien varie d'une minute à l'autre
