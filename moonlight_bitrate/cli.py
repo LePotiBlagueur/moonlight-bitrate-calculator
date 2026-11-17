@@ -87,6 +87,13 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--refine", type=int, dest="refine_steps",
                    help="Itérations de dichotomie après le premier échec")
     g.add_argument("--no-ping", action="store_true", help="Sauter la sonde ICMP")
+    g.add_argument("--probe-mtu", action="store_true",
+                   help="Sonder uniquement la MTU du chemin et sortir")
+    g.add_argument("--no-mtu-check", action="store_true",
+                   help="Ne pas vérifier la MTU avant de mesurer")
+    g.add_argument("--underlay", action="store_true",
+                   help="Avec --probe-mtu : le chemin sondé TRANSPORTE le "
+                        "tunnel (déduit la MTU WireGuard à configurer)")
 
     g = p.add_argument_group("modèle de débit")
     g.add_argument("--codec", choices=sorted(CODEC_EFFICIENCY),
@@ -148,6 +155,8 @@ def apply_overrides(cfg: AppConfig, args: argparse.Namespace) -> AppConfig:
         cfg.bench.tcp_probe = False
     if args.no_ping:
         cfg.bench.ping_probe = False
+    if args.no_mtu_check:
+        cfg.bench.mtu_check = False
 
     model_map = {
         "codec": "codec", "quality": "quality", "fec_overhead": "fec_overhead",
@@ -190,6 +199,8 @@ def profile_to_dict(profile: NetworkProfile, cfg: AppConfig) -> dict:
         "primary": asdict(profile.primary),
         "secondary": asdict(profile.secondary) if profile.secondary else None,
         "ping": asdict(profile.ping) if profile.ping else None,
+        "mtu": profile.mtu,
+        "mtu_method": profile.mtu_method,
     }
 
 
@@ -220,6 +231,8 @@ def profile_from_dict(data: dict) -> NetworkProfile:
         primary=primary,
         secondary=_profile_from_dict(data.get("secondary")),
         ping=PingResult(**ping) if ping else None,
+        mtu=data.get("mtu"),
+        mtu_method=data.get("mtu_method", ""),
     )
 
 
@@ -231,6 +244,17 @@ def profile_from_dict(data: dict) -> NetworkProfile:
 def run(cfg: AppConfig, args: argparse.Namespace, log: Logger) -> int:
     if cfg.active_profile:
         log.step(f"Profil actif : {cfg.active_profile}")
+
+    if args.probe_mtu:
+        from . import mtu as mtu_mod
+        from .report import mtu_report
+
+        result = mtu_mod.discover(cfg.host.host, cfg.host.iperf_port)
+        effective = result.effective_mtu
+        advice = (mtu_mod.advise(effective, through_tunnel=not args.underlay)
+                  if effective else None)
+        mtu_report(result, advice, log)
+        return 0 if effective else 2
     if args.load:
         log.step(f"Lecture des mesures enregistrées : {args.load}")
         profile = profile_from_dict(json.loads(Path(args.load).read_text("utf-8")))

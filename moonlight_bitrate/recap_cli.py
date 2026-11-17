@@ -99,6 +99,8 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--max-jitter", type=float, dest="max_jitter_ms",
                    help="Gigue maximale tolérée par palier (ms)")
     g.add_argument("--no-ping", action="store_true", help="Sauter la sonde ICMP")
+    g.add_argument("--no-mtu-check", action="store_true",
+                   help="Ne pas vérifier la MTU avant de mesurer")
 
     g = p.add_argument_group("modèle")
     g.add_argument("--codec", choices=sorted(CODEC_EFFICIENCY),
@@ -163,6 +165,8 @@ def apply_overrides(cfg: AppConfig, args: argparse.Namespace) -> AppConfig:
         cfg.bench.tcp_probe = False
     if args.no_ping:
         cfg.bench.ping_probe = False
+    if args.no_mtu_check:
+        cfg.bench.mtu_check = False
     for arg in ("codec", "quality", "fec_overhead", "audio_mbps", "safety_margin"):
         value = getattr(args, arg, None)
         if value is not None:

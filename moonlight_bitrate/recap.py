@@ -82,6 +82,11 @@ def network_table(profile: NetworkProfile) -> Table:
             f"{p.jitter_ms:.2f}" if p.clean_trial else "—",
         ])
     notes = []
+    if profile.mtu:
+        notes.append(
+            f"MTU du chemin : {profile.mtu} octets"
+            + (f" (méthode : {profile.mtu_method})" if profile.mtu_method else "")
+        )
     if profile.ping:
         notes.append(
             f"Latence ICMP : {profile.ping.avg_ms:.2f} ms "

@@ -105,6 +105,42 @@ def _visible_len(text: str) -> int:
     return out
 
 
+def mtu_report(result, advice, log: "Logger") -> None:
+    """Détail d'une sonde de MTU et réglages qui en découlent."""
+    c = log.c
+    log.section(f"MTU du chemin vers {result.host}")
+    rows = [
+        ["MTU du chemin (ICMP)",
+         f"{result.path_mtu}" if result.path_mtu else "—"],
+        ["MTU de la route locale",
+         f"{result.route_mtu}" if result.route_mtu else "—"],
+        ["Méthode retenue", result.method],
+    ]
+    print(_table(["Mesure", "Octets"], rows, aligns="lr"))
+    if result.note:
+        print(f"  {c.dim}{result.note}{c.reset}")
+    if result.probes:
+        detail = ", ".join(f"{size}{'✓' if ok else '✗'}" for size, ok in result.probes)
+        print(f"  {c.dim}Sondes : {detail}{c.reset}")
+
+    if advice is None:
+        log.error("MTU indéterminée : gardez une valeur basse "
+                  "(datagram_len = 1252, MTU WireGuard = 1280).")
+        return
+
+    print()
+    rows = [
+        ["bench.datagram_len", f"{advice.datagram_len}",
+         "taille des datagrammes de mesure"],
+        ["Sunshine packet_size", f"{advice.sunshine_packet_size}",
+         "à aligner dans la config de Sunshine"],
+        ["MTU WireGuard", f"{advice.wireguard_mtu}",
+         "si ce chemin EST le tunnel" if advice.through_tunnel
+         else "si ce chemin TRANSPORTE le tunnel"],
+    ]
+    print(_table(["Réglage", "Valeur", "Où"], rows, aligns="lrl"))
+
+
 def network_report(profile: NetworkProfile, log: Logger) -> None:
     log.section("Synthèse réseau")
     rows = []

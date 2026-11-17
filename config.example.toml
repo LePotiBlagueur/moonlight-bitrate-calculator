@@ -33,6 +33,8 @@ omit = 1               # secondes ignorées en début de palier
 # les vieux builds Cygwin rendent une sortie vide en UDP avec -P.
 streams = 1
 datagram_len = 1400    # octets, sous la MTU pour éviter la fragmentation
+mtu_check = true       # sonder la MTU du chemin avant de mesurer
+mtu_autofit = true     # et réduire datagram_len s'il ne tient pas
 
 tcp_probe = true       # sonde TCP pour cadrer la recherche UDP
 tcp_duration = 6
@@ -109,10 +111,12 @@ safety_margin = 0.85
 host = "192.168.1.10"
 
 [profiles.vpn.bench]
-# WireGuard ajoute 60 octets d'encapsulation (IPv4) et prend une MTU de 1420
-# par défaut : 1420 - 20 (IP) - 8 (UDP) = 1392 utiles. 1380 laisse une marge
-# et évite la fragmentation, qui fausserait complètement le taux de perte.
-datagram_len = 1380
+# NE DEVINEZ PAS cette valeur : `moonlight-bitrate -c config.toml -p vpn
+# --probe-mtu` vous donne la bonne. WireGuard prend 1420 par défaut, mais la
+# MTU réelle est souvent plus basse (1360 sur l'installation de test), et un
+# datagramme trop gros se fragmente — le taux de perte relevé ne mesure alors
+# plus que la fragmentation. mtu_autofit corrige automatiquement.
+datagram_len = 1332    # = MTU 1360 - 20 (IP) - 8 (UDP)
 assumed_ceiling_mbps = 300.0
 max_jitter_ms = 8.0          # la gigue d'un tunnel n'a rien à voir avec un LAN
 max_loss_pct = 0.30

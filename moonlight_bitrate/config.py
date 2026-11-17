@@ -57,6 +57,13 @@ class BenchConfig:
     omit: int = 1  # secondes ignorées en début de palier (slow start)
     streams: int = 1  # flux UDP parallèles (augmenter si l'émetteur plafonne)
     datagram_len: int = 1400  # octets, à garder sous la MTU
+    # Vérifier la MTU du chemin avant de mesurer (instantané via la route,
+    # complété par une sonde ICMP quand l'hôte y répond).
+    mtu_check: bool = True
+    # Réduire automatiquement datagram_len s'il dépasse la MTU trouvée.
+    # Sans ça, chaque datagramme se fragmente et le taux de perte mesuré ne
+    # reflète plus que la fragmentation.
+    mtu_autofit: bool = True
     # Sonde TCP préalable pour borner la recherche UDP.
     tcp_probe: bool = True
     tcp_duration: int = 6

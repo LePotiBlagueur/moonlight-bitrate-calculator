@@ -19,7 +19,7 @@ théorique.
 | Formule maison `30 Mbps × ratio de pixels` | Formule **exacte de Moonlight** (table de pixels interpolée, racine carrée au-delà de 60 fps) |
 | Une seule résolution | **Matrice** résolutions × fréquences, verdict par case |
 | Codec ignoré | Efficacité **H.264 / HEVC / AV1** et préréglages de qualité |
-| Script monolithique | Paquet testé (74 tests), config TOML, rejeu hors ligne |
+| Script monolithique | Paquet testé (91 tests), config TOML, rejeu hors ligne |
 | Sortie texte unique | CLI récap dédiée : table, Markdown, CSV, HTML, JSON |
 | À lancer avec Python | Exécutables Windows autonomes (`.exe`) |
 
@@ -132,11 +132,52 @@ ping_probe = false           # l'ICMP ne traverse pas toujours le tunnel
 safety_margin = 0.75         # plus de marge : le lien varie d'une minute à l'autre
 ```
 
-**La taille des datagrammes n'est pas un détail.** WireGuard ajoute 60 octets
-d'encapsulation et prend une MTU de 1420 par défaut, soit 1420 − 20 (IP) − 8
-(UDP) = 1392 octets utiles. Un `datagram_len` de 1400 dans le tunnel fait
-fragmenter chaque paquet, et le taux de perte mesuré devient du bruit. 1380
-laisse une marge.
+**La taille des datagrammes n'est pas un détail, et ne se devine pas.** Un
+datagramme plus gros que la MTU est fragmenté : le taux de perte relevé ne
+mesure alors plus le lien mais la fragmentation. L'outil sonde donc la MTU
+avant de mesurer et ajuste `datagram_len` tout seul :
+
+```
+  · Contrôle de la MTU du chemin
+  ✓ MTU du chemin : 1360 octets (méthode : route)
+  ! datagram_len = 1380 dépasse la MTU (1360) : chaque datagramme serait
+    fragmenté et la perte mesurée ne vaudrait rien. Ramené à 1332.
+```
+
+Pour connaître la valeur sans lancer de mesure :
+
+```bash
+moonlight-bitrate -c config.toml -p vpn --probe-mtu
+```
+
+```
+  Mesure                 │ Octets        Réglage              │ Valeur
+  ───────────────────────┼───────        ─────────────────────┼───────
+  MTU du chemin (ICMP)   │      —        bench.datagram_len   │   1332
+  MTU de la route locale │   1360        Sunshine packet_size │   1332
+  Méthode retenue        │  route        MTU WireGuard        │   1360
+```
+
+Deux méthodes, parce qu'aucune ne suffit seule :
+
+- **ICMP avec bit « ne pas fragmenter »**, par dichotomie : c'est la vraie MTU
+  de bout en bout, mais beaucoup de tunnels et de pare-feu ne répondent pas à
+  l'ICMP. Un garde-fou vérifie d'abord que l'hôte répond du tout, sans quoi un
+  hôte muet ferait conclure à une MTU minuscule.
+- **MTU de la route locale**, lue auprès du noyau : instantanée et toujours
+  disponible, mais ce n'est qu'une borne haute — un goulet plus loin sur le
+  chemin ne s'y verrait pas.
+
+Quand les deux répondent, c'est la plus basse qui s'applique. `--underlay`
+indique que le chemin sondé *transporte* le tunnel au lieu d'être dedans :
+l'outil retranche alors les 60 octets d'encapsulation WireGuard pour donner la
+MTU à configurer côté tunnel.
+
+Le `packet_size` de Sunshine se règle sur la même valeur : s'il dépasse ce que
+le tunnel peut porter, chaque trame vidéo se fragmente.
+
+`mtu_check = false` désactive le contrôle, `mtu_autofit = false` le laisse
+avertir sans corriger.
 
 Une option passée en ligne de commande reste prioritaire sur le profil, qui
 est lui-même prioritaire sur les sections de base. Un nom de profil inexistant
@@ -327,12 +368,13 @@ datagram_len = 8900   # trames jumbo si le réseau les accepte
 python -m unittest discover -s tests -v
 ```
 
-Les 74 tests couvrent la formule Moonlight (valeurs de référence publiées), le
+Les 91 tests couvrent la formule Moonlight (valeurs de référence publiées), le
 parsing des trois formes de JSON UDP d'iperf3, la convergence de la recherche
 par paliers sur un lien simulé, les surcharges des deux CLI, chaque format de
 rendu du récap, la logique de double-clic des exécutables, et la
 détection de version d'iperf3 (calée sur la sortie d'un hôte réel en 3.1.4)
-et la superposition des profils.
+la superposition des profils et la
+sonde de MTU.
 
 ## Structure
 
@@ -342,6 +384,7 @@ moonlight_bitrate/
   remote.py   serveur iperf3 distant par SSH (contexte auto-nettoyant)
   iperf.py    exécution d'iperf3, parsing JSON robuste, sonde ICMP
   ladder.py   recherche de la capacité UDP propre (paliers + dichotomie)
+  mtu.py      MTU du chemin (ICMP + route) et réglages déduits
   model.py    formule Moonlight, FEC/audio, faisabilité par mode
   report.py   journal console et tableaux
   cli.py      arguments, orchestration, JSON

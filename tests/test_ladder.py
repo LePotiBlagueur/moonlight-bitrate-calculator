@@ -41,6 +41,8 @@ class TestLadder(unittest.TestCase):
     def setUp(self):
         self.cfg = AppConfig()
         self.cfg.bench.ping_probe = False
+        # Pas d'E/S réseau dans les tests : la sonde MTU a sa propre suite.
+        self.cfg.bench.mtu_check = False
         self.cfg.bench.retry_on_fail = False
         self.log = SilentLogger()
         self._orig_udp = ladder.run_udp

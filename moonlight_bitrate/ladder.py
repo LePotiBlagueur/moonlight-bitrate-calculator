@@ -5,6 +5,7 @@ from __future__ import annotations
 import platform
 from dataclasses import dataclass, field
 
+from . import mtu as mtu_mod
 from .config import AppConfig
 from .iperf import PingResult, UdpTrial, run_ping, run_tcp, run_udp
 
@@ -40,6 +41,47 @@ class NetworkProfile:
     primary: DirectionProfile
     secondary: DirectionProfile | None = None
     ping: PingResult | None = None
+    mtu: int | None = None
+    mtu_method: str = ""
+
+
+def check_mtu(cfg: AppConfig, log) -> tuple[int | None, str]:
+    """Vérifie que `datagram_len` tient dans la MTU, et l'ajuste si demandé.
+
+    Un datagramme plus gros que la MTU est fragmenté : la perte relevée ne
+    mesure alors plus le lien mais la fragmentation. C'est le piège classique
+    d'une mesure à travers un tunnel.
+    """
+    if not cfg.bench.mtu_check:
+        return None, ""
+
+    log.step("Contrôle de la MTU du chemin")
+    result = mtu_mod.discover(cfg.host.host, cfg.host.iperf_port)
+    effective = result.effective_mtu
+    if effective is None:
+        log.warn("MTU du chemin indéterminée (ni ICMP ni route) : "
+                 f"datagram_len = {cfg.bench.datagram_len} conservé tel quel.")
+        return None, result.method
+
+    log.ok(f"MTU du chemin : {effective} octets (méthode : {result.method})")
+    if mtu_mod.fits(cfg.bench.datagram_len, effective):
+        return effective, result.method
+
+    fitted = mtu_mod.advise(effective).datagram_len
+    if cfg.bench.mtu_autofit:
+        log.warn(
+            f"datagram_len = {cfg.bench.datagram_len} dépasse la MTU "
+            f"({effective}) : chaque datagramme serait fragmenté et la perte "
+            f"mesurée ne vaudrait rien. Ramené à {fitted}."
+        )
+        cfg.bench.datagram_len = fitted
+    else:
+        log.warn(
+            f"datagram_len = {cfg.bench.datagram_len} dépasse la MTU "
+            f"({effective}) : les datagrammes seront fragmentés. "
+            f"Valeur conseillée : {fitted} (bench.mtu_autofit = true l'applique)."
+        )
+    return effective, result.method
 
 
 def _evaluate(trial: UdpTrial, cfg: AppConfig) -> UdpTrial:
@@ -177,6 +219,7 @@ def _probe_direction(cfg: AppConfig, log, direction: str) -> DirectionProfile:
 
 
 def measure(cfg: AppConfig, log) -> NetworkProfile:
+    path_mtu, mtu_method = check_mtu(cfg, log)
     directions = (
         ["download", "upload"] if cfg.bench.direction == "both"
         else [cfg.bench.direction]
@@ -198,4 +241,6 @@ def measure(cfg: AppConfig, log) -> NetworkProfile:
         primary=profiles[0],
         secondary=profiles[1] if len(profiles) > 1 else None,
         ping=ping,
+        mtu=path_mtu,
+        mtu_method=mtu_method,
     )
