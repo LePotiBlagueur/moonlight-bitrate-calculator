@@ -65,18 +65,30 @@ audio_mbps = 0.5       # 0.5 en stéréo, ~1.5 en 5.1/7.1
 safety_margin = 0.85   # part de la capacité propre réellement exploitée
 marginal_tolerance = 0.15
 
-# [nom affiché, largeur, hauteur]
+# [nom affiché, largeur, hauteur] — toutes les tailles d'écran
+# courantes ; retirez celles que vous n'utiliserez jamais.
+# Au-delà de la 4K, Moonlight plafonne sa référence : ces lignes
+# sont signalées « * » dans les tableaux et donnent un plancher.
 resolutions = [
-  ["720p",        1280,  720],
-  ["900p",        1600,  900],
-  ["1080p",       1920, 1080],
-  ["1200p 16:10", 1920, 1200],
-  ["1440p",       2560, 1440],
-  ["1600p 16:10", 2560, 1600],
-  ["UW 1440p",    3440, 1440],
-  ["4K",          3840, 2160],
+  ["720p",           1280,  720],
+  ["800p 16:10",     1280,  800],
+  ["900p",           1600,  900],
+  ["1080p",          1920, 1080],
+  ["1200p 16:10",    1920, 1200],
+  ["UW 1080p",       2560, 1080],
+  ["1440p",          2560, 1440],
+  ["1600p 16:10",    2560, 1600],
+  ["UW 1440p",       3440, 1440],
+  ["1800p 16:10",    2880, 1800],
+  ["1800p",          3200, 1800],
+  ["UW 1600p",       3840, 1600],
+  ["SUW 1440p 32:9", 5120, 1440],
+  ["4K",             3840, 2160],
+  ["4K 16:10",       3840, 2400],
+  ["5K2K UW",        5120, 2160],
+  ["5K",             5120, 2880],
 ]
-framerates = [60, 90, 120, 144]
+framerates = [60, 90, 120, 144, 175]
 
 # ==========================================================================
 # Profils : surcouches appliquées avec -p/--profile.

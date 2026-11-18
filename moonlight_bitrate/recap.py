@@ -12,13 +12,15 @@ from .config import CODEC_EFFICIENCY, QUALITY_FACTOR, AppConfig, ModelConfig
 from .ladder import DIRECTION_LABEL, NetworkProfile
 from .model import (
     ModeTarget,
+    best_fps,
+    best_per_resolution,
     build_matrix,
     budget_from_capacity,
-    evaluate_mode,
     max_video_for_budget,
-    recommend_codec,
+    recommend_codec_short,
+    reference_is_clamped,
 )
-from .report import Palette, _table
+from .report import CLAMP_NOTE, Palette, _table
 
 MARK = {"ok": "✓", "marginal": "~", "no": "✗"}
 CODEC_LABEL = {"h264": "H.264", "hevc": "HEVC", "av1": "AV1"}
@@ -60,17 +62,6 @@ def _cell(t: ModeTarget | None, plain: bool) -> str:
     return f"{t.advised_mbps:.0f}" if plain else f"{t.advised_mbps:.0f} {mark}"
 
 
-def _best_fps(resolution: tuple[str, int, int], budget: float, m: ModelConfig,
-              accept_marginal: bool = False) -> ModeTarget | None:
-    _, w, h = resolution
-    allowed = ("ok", "marginal") if accept_marginal else ("ok",)
-    for fps in sorted(m.framerates, reverse=True):
-        mode = evaluate_mode(resolution[0], w, h, fps, budget, m)
-        if mode.verdict in allowed:
-            return mode
-    return None
-
-
 def network_table(profile: NetworkProfile) -> Table:
     rows = []
     for p in filter(None, [profile.primary, profile.secondary]):
@@ -107,17 +98,25 @@ def network_table(profile: NetworkProfile) -> Table:
 def matrix_table(budget: float, m: ModelConfig, plain: bool) -> Table:
     framerates = sorted(m.framerates)
     by_key = {(t.width, t.height, t.fps): t for t in build_matrix(budget, m)}
-    rows = []
+    rows, clamped = [], False
     for name, w, h in m.resolutions:
+        if reference_is_clamped(w, h):
+            clamped = True
+            name += "" if plain else " *"
         row = [name, f"{w}x{h}"]
         row += [_cell(by_key.get((w, h, fps)), plain) for fps in framerates]
         rows.append(row)
+    notes = []
+    if not plain:
+        notes.append("✓ confortable · ~ limite · ✗ hors budget")
+        if clamped:
+            notes.append(CLAMP_NOTE)
     return Table(
         title=f"Débit à régler dans Moonlight — {CODEC_LABEL.get(m.codec, m.codec)}, "
               f"préréglage « {m.quality} » (Mbps)",
         headers=["Résolution", "Définition"] + [f"{f} fps" for f in framerates],
         rows=rows, aligns="ll" + "r" * len(framerates),
-        notes=["✓ confortable · ~ limite · ✗ hors budget"] if not plain else [],
+        notes=notes,
     )
 
 
@@ -125,11 +124,16 @@ def codec_table(budget: float, m: ModelConfig) -> Table:
     """Pour chaque résolution, le meilleur mode tenable selon le codec."""
     codecs = ["h264", "hevc", "av1"]
     rows = []
+    clamped = False
     for resolution in m.resolutions:
-        row = [resolution[0], f"{resolution[1]}x{resolution[2]}"]
+        name, w, h = resolution
+        if reference_is_clamped(w, h):
+            clamped = True
+            name += " *"
+        row = [name, f"{w}x{h}"]
         for codec in codecs:
             variant = ModelConfig(**{**m.__dict__, "codec": codec})
-            best = _best_fps(resolution, budget, variant)
+            best = best_fps(resolution, budget, variant)
             row.append(f"{best.fps} fps · {best.advised_mbps:.0f}" if best else "—")
         rows.append(row)
     return Table(
@@ -137,7 +141,8 @@ def codec_table(budget: float, m: ModelConfig) -> Table:
         headers=["Résolution", "Définition"] + [CODEC_LABEL[c] for c in codecs],
         rows=rows, aligns="llrrr",
         notes=["Efficacité relative appliquée : " + ", ".join(
-            f"{CODEC_LABEL[c]} ×{CODEC_EFFICIENCY[c]:.2f}" for c in codecs)],
+            f"{CODEC_LABEL[c]} ×{CODEC_EFFICIENCY[c]:.2f}" for c in codecs)]
+        + ([CLAMP_NOTE] if clamped else []),
     )
 
 
@@ -148,11 +153,13 @@ def quality_table(budget: float, m: ModelConfig) -> Table:
         variant = ModelConfig(**{**m.__dict__, "quality": preset})
         candidates = [
             best for best in (
-                _best_fps(resolution, budget, variant) for resolution in m.resolutions
+                best_fps(resolution, budget, variant) for resolution in m.resolutions
             ) if best
         ]
         if candidates:
-            best = max(candidates, key=lambda t: t.pixel_rate)
+            # Une définition plafonnée afficherait le débit de la 4K : on
+            # préfère la plus grande taille dont la référence est réelle.
+            best = max(candidates, key=lambda t: (not t.clamped, t.pixel_rate))
             rows.append([
                 preset, f"×{QUALITY_FACTOR[preset]:.2f}",
                 f"{best.width}x{best.height}", f"{best.fps}",
@@ -170,29 +177,35 @@ def quality_table(budget: float, m: ModelConfig) -> Table:
 
 
 def best_table(budget: float, m: ModelConfig) -> Table:
-    matrix = build_matrix(budget, m)
-    feasible = sorted(
-        [t for t in matrix if t.verdict == "ok"],
-        key=lambda t: t.pixel_rate, reverse=True,
-    )[:5]
-    rows = [[
-        f"{t.width}x{t.height}", f"{t.fps}", f"{t.advised_mbps:.0f}",
-        f"{t.link_mbps:.1f}", f"{t.headroom:.2f}×",
-    ] for t in feasible]
-    notes = []
-    if feasible:
-        first = feasible[0]
-        notes.append(
-            f"Conseillé : {first.width}x{first.height} @ {first.fps} fps à "
-            f"{first.advised_mbps:.0f} Mbps — "
-            f"{recommend_codec(first.advised_mbps, first.width, first.height)}"
-        )
-    else:
-        notes.append("Aucun mode ne tient dans le budget mesuré.")
+    """Le mode le plus élevé tenable pour chaque taille d'écran."""
+    rows, clamped, marginal = [], False, False
+    for (name, w, h), t in best_per_resolution(build_matrix(budget, m)):
+        if t is None:
+            rows.append([name, f"{w}x{h}", "—", "—", "—", "hors budget"])
+            continue
+        clamped = clamped or t.clamped
+        marginal = marginal or t.verdict == "marginal"
+        rows.append([
+            name + (" *" if t.clamped else ""),
+            f"{w}x{h}",
+            f"{t.fps}" + ("" if t.verdict == "ok" else " ~"),
+            f"{t.advised_mbps:.0f}",
+            f"{t.headroom:.2f}×",
+            recommend_codec_short(t.advised_mbps, w, h),
+        ])
+    notes = ["Prenez la ligne de votre écran : au-delà du lien, ce sont la dalle "
+             "et le GPU qui limitent."]
+    if marginal:
+        notes.append("~ mode limite : tenable, sans marge.")
+    if clamped:
+        notes.append(CLAMP_NOTE)
+    if all(row[2] == "—" for row in rows):
+        notes = ["Aucun mode ne tient dans le budget mesuré."]
     return Table(
-        title="Meilleurs modes confortables",
-        headers=["Résolution", "fps", "Mbps à régler", "Charge réseau", "Marge"],
-        rows=rows, aligns="lrrrr", notes=notes,
+        title="Mode le plus élevé tenable par taille d'écran",
+        headers=["Résolution", "Définition", "fps max", "Mbps à régler",
+                 "Marge", "Codec"],
+        rows=rows, aligns="llrrrl", notes=notes,
     )
 
 

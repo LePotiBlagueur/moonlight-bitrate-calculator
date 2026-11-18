@@ -82,6 +82,7 @@ La référence est la formule de Moonlight elle-même
 facteur de résolution : interpolation linéaire sur le nombre de pixels
     360p → 1    480p → 2    720p → 5
    1080p → 10  1440p → 20  2160p → 40
+   au-delà de 3840x2160 : plafonné à 40 (comme Moonlight)
 
 facteur de fréquence :  fps ≤ 60  →  fps / 30
                         fps > 60  →  √(fps / 60) × 60 / 30
@@ -92,6 +93,12 @@ débit = facteur de résolution × facteur de fréquence
 D'où 1080p60 = 20 Mbps, 1440p60 = 40, 4K60 = 80. Au-delà de 60 fps le besoin
 croît en racine carrée, pas linéairement : passer de 60 à 120 fps ne double
 pas le débit nécessaire, il le multiplie par ~1,41.
+
+Le tableau s'arrête à la 4K, et la sentinelle du code amont renvoie alors le
+dernier facteur : une 5K reçoit par défaut le même débit qu'une 4K. On
+reproduit ce plafond plutôt que de prolonger la pente — c'est bien ce que
+Moonlight proposera — mais les lignes concernées sont marquées `*` dans les
+tableaux : la valeur y est un plancher, pas le besoin réel d'une 5K.
 
 Deux facteurs s'appliquent ensuite :
 

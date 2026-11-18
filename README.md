@@ -82,16 +82,55 @@ moonlight-bitrate --load mesures.json --json       # sortie machine
 
   Latence ICMP : 1.84 ms (± 0.62 ms), perte 0.0 %
 
-── Débit conseillé par mode (Mbps à saisir dans Moonlight) ───────
-  Résolution  │ Définition │  60 fps │  90 fps │ 120 fps │ 144 fps
-  ────────────┼────────────┼─────────┼─────────┼─────────┼────────
-  1080p       │ 1920x1080  │    15 ✓ │    18 ✓ │    21 ✓ │    23 ✓
-  1200p 16:10 │ 1920x1200  │    17 ✓ │    21 ✓ │    24 ✓ │    27 ✓
-  1440p       │ 2560x1440  │    30 ✓ │    37 ✓ │    42 ✓ │    46 ✓
-  4K          │ 3840x2160  │    60 ✓ │    73 ✓ │    85 ✓ │    93 ✓
+── Débit conseillé par mode (Mbps à saisir dans Moonlight) ───
+  Résolution     │ Définition │ 60 fps │ 90 fps │ 120 fps │ 144 fps │ 175 fps
+  ───────────────┼────────────┼────────┼────────┼─────────┼─────────┼────────
+  720p           │ 1280x720   │    8 ✓ │    9 ✓ │    11 ✓ │    12 ✓ │    13 ✓
+  800p 16:10     │ 1280x800   │    8 ✓ │   10 ✓ │    12 ✓ │    13 ✓ │    14 ✓
+  900p           │ 1600x900   │   11 ✓ │   13 ✓ │    15 ✓ │    17 ✓ │    19 ✓
+  1080p          │ 1920x1080  │   15 ✓ │   18 ✓ │    21 ✓ │    23 ✓ │    26 ✓
+  1200p 16:10    │ 1920x1200  │   17 ✓ │   21 ✓ │    24 ✓ │    27 ✓ │    29 ✓
+  UW 1080p       │ 2560x1080  │   21 ✓ │   26 ✓ │    30 ✓ │    33 ✓ │    37 ✓
+  1440p          │ 2560x1440  │   30 ✓ │   37 ✓ │    42 ✓ │    46 ✓ │    51 ✓
+  1600p 16:10    │ 2560x1600  │   33 ✓ │   40 ✓ │    46 ✓ │    51 ✓ │    56 ✓
+  UW 1440p       │ 3440x1440  │   38 ✓ │   47 ✓ │    54 ✓ │    59 ✓ │    65 ✓
+  1800p 16:10    │ 2880x1800  │   40 ✓ │   49 ✓ │    56 ✓ │    62 ✓ │    68 ✓
+  1800p          │ 3200x1800  │   44 ✓ │   53 ✓ │    62 ✓ │    67 ✓ │    74 ✓
+  UW 1600p       │ 3840x1600  │   46 ✓ │   56 ✓ │    65 ✓ │    71 ✓ │    79 ✓
+  SUW 1440p 32:9 │ 5120x1440  │   54 ✓ │   66 ✓ │    76 ✓ │    84 ✓ │    92 ✓
+  4K             │ 3840x2160  │   60 ✓ │   73 ✓ │    85 ✓ │    93 ✓ │   102 ✓
+  4K 16:10 *     │ 3840x2400  │   60 ✓ │   73 ✓ │    85 ✓ │    93 ✓ │   102 ✓
+  5K2K UW *      │ 5120x2160  │   60 ✓ │   73 ✓ │    85 ✓ │    93 ✓ │   102 ✓
+  5K *           │ 5120x2880  │   60 ✓ │   73 ✓ │    85 ✓ │    93 ✓ │   102 ✓
+  ✓ confortable · ~ limite · ✗ hors budget
+  * au-delà de la 4K, Moonlight plafonne sa référence de débit : la valeur affichée est un plancher, pas le besoin réel.
+
+── Mode le plus élevé tenable par taille d'écran ───────────────
+  Résolution     │ Définition │ fps max │ Mbps à régler │  Marge │ Codec                 
+  ───────────────┼────────────┼─────────┼───────────────┼────────┼───────────────────────
+  720p           │ 1280x720   │     175 │            13 │ 23.91× │ HEVC (H.264 au besoin)
+  800p 16:10     │ 1280x800   │     175 │            14 │ 22.02× │ HEVC (H.264 au besoin)
+  900p           │ 1600x900   │     175 │            19 │ 16.66× │ HEVC (H.264 au besoin)
+  1080p          │ 1920x1080  │     175 │            26 │ 12.15× │ HEVC                  
+  1200p 16:10    │ 1920x1200  │     175 │            29 │ 10.65× │ HEVC                  
+  UW 1080p       │ 2560x1080  │     175 │            37 │  8.54× │ HEVC                  
+  1440p          │ 2560x1440  │     175 │            51 │  6.12× │ AV1 ou HEVC           
+  1600p 16:10    │ 2560x1600  │     175 │            56 │  5.63× │ AV1 ou HEVC           
+  UW 1440p       │ 3440x1440  │     175 │            65 │  4.81× │ AV1 ou HEVC           
+  1800p 16:10    │ 2880x1800  │     175 │            68 │  4.63× │ AV1 ou HEVC           
+  1800p          │ 3200x1800  │     175 │            74 │  4.23× │ AV1 ou HEVC           
+  UW 1600p       │ 3840x1600  │     175 │            79 │  4.00× │ AV1 ou HEVC           
+  SUW 1440p 32:9 │ 5120x1440  │     175 │            92 │  3.41× │ AV1 ou HEVC           
+  4K             │ 3840x2160  │     175 │           102 │  3.07× │ AV1 ou HEVC           
+  4K 16:10 *     │ 3840x2400  │     175 │           102 │  3.07× │ AV1 ou HEVC           
+  5K2K UW *      │ 5120x2160  │     175 │           102 │  3.07× │ AV1 ou HEVC           
+  5K *           │ 5120x2880  │     175 │           102 │  3.07× │ AV1 ou HEVC           
+  Prenez la ligne de votre écran : au-delà du lien, ce sont la dalle et le GPU qui limitent.
+  * au-delà de la 4K, Moonlight plafonne sa référence de débit : la valeur affichée est un plancher, pas le besoin réel.
 ```
 
-`✓` confortable · `~` limite · `✗` hors budget.
+Une ligne par taille d'écran : prenez la vôtre, le reste est du
+contexte. `✓` confortable · `~` limite · `✗` hors budget.
 
 ## Deux liens, deux profils
 
@@ -210,7 +249,7 @@ n'en garder que certaines) :
 | `matrix` | Matrice résolutions × fps → débit à régler, avec verdict par case |
 | `codecs` | Pour chaque résolution, le mode le plus élevé tenable en H.264 / HEVC / AV1 |
 | `quality` | Ce que chaque préréglage (`saver` → `max`) permet d'atteindre |
-| `best` | Les cinq meilleurs modes confortables, classés par charge de pixels |
+| `best` | Une ligne par taille d'écran : la fréquence la plus haute tenable, le débit à régler et la marge |
 
 Cinq formats de sortie : `table` (défaut, couleurs dans le terminal),
 `markdown`, `csv` (séparateur `;`, prêt pour Excel), `html` (page autonome,
@@ -226,14 +265,27 @@ Exemple (`--sections codecs`, lien à 60 Mbps) :
 
 ```
 ── Mode le plus élevé tenable selon le codec (fps · Mbps) ──────
-  Résolution  │ Définition │        H.264 │         HEVC │          AV1
-  ────────────┼────────────┼──────────────┼──────────────┼─────────────
-  1080p       │ 1920x1080  │ 144 fps · 31 │ 144 fps · 23 │ 144 fps · 20
-  1440p       │ 2560x1440  │  60 fps · 40 │  90 fps · 37 │ 144 fps · 40
-  1600p 16:10 │ 2560x1600  │            — │  90 fps · 40 │ 120 fps · 40
-  UW 1440p    │ 3440x1440  │            — │  60 fps · 38 │  90 fps · 41
-  4K          │ 3840x2160  │            — │            — │            —
-```
+  Résolution     │ Définition │        H.264 │         HEVC │          AV1
+  ───────────────┼────────────┼──────────────┼──────────────┼─────────────
+  720p           │ 1280x720   │ 175 fps · 17 │ 175 fps · 13 │ 175 fps · 11
+  800p 16:10     │ 1280x800   │ 175 fps · 19 │ 175 fps · 14 │ 175 fps · 12
+  900p           │ 1600x900   │ 175 fps · 25 │ 175 fps · 19 │ 175 fps · 16
+  1080p          │ 1920x1080  │ 175 fps · 34 │ 175 fps · 26 │ 175 fps · 22
+  1200p 16:10    │ 1920x1200  │ 175 fps · 39 │ 175 fps · 29 │ 175 fps · 25
+  UW 1080p       │ 2560x1080  │ 120 fps · 40 │ 175 fps · 37 │ 175 fps · 32
+  1440p          │ 2560x1440  │  60 fps · 40 │  90 fps · 37 │ 144 fps · 40
+  1600p 16:10    │ 2560x1600  │            — │  90 fps · 40 │ 120 fps · 40
+  UW 1440p       │ 3440x1440  │            — │  60 fps · 38 │  90 fps · 41
+  1800p 16:10    │ 2880x1800  │            — │  60 fps · 40 │  60 fps · 34
+  1800p          │ 3200x1800  │            — │            — │  60 fps · 38
+  UW 1600p       │ 3840x1600  │            — │            — │  60 fps · 40
+  SUW 1440p 32:9 │ 5120x1440  │            — │            — │            —
+  4K             │ 3840x2160  │            — │            — │            —
+  4K 16:10 *     │ 3840x2400  │            — │            — │            —
+  5K2K UW *      │ 5120x2160  │            — │            — │            —
+  5K *           │ 5120x2880  │            — │            — │            —
+  Efficacité relative appliquée : H.264 ×1.00, HEVC ×0.75, AV1 ×0.65
+  * au-delà de la 4K, Moonlight plafonne sa référence de débit : la valeur affichée est un plancher, pas le besoin réel.```
 
 Avec un fichier de config, les listes de résolutions et de fréquences du récap
 sont celles de `[model]`; en ligne de commande, `--resolution` et `--fps`
@@ -259,7 +311,7 @@ versions Python.
 *Run workflow* dans l'onglet Actions :
 
 ```bash
-git tag v2.1.0 && git push origin v2.1.0
+git tag v2.2.0 && git push origin v2.2.0
 ```
 
 `.github/workflows/build-windows.yml` lance les tests sous Linux, compile sous

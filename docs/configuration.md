@@ -90,8 +90,8 @@ Un profil est une surcouche : il ne redéfinit que les clés qu'il cite.
 | `audio_mbps` | `0.5` | Débit audio réservé. 0.5 en stéréo, ~1.5 en 5.1/7.1. |
 | `safety_margin` | `0.85` | Part de la capacité propre mesurée réellement exploitée. |
 | `marginal_tolerance` | `0.15` | Au-delà du budget mais sous cette tolérance, un mode est marqué « limite » plutôt qu'« impossible ». |
-| `resolutions` | 8 entrées, de 720p à 4K | Liste de `["nom", largeur, hauteur]`. |
-| `framerates` | `[60, 90, 120, 144]` | Fréquences évaluées. |
+| `resolutions` | 17 entrées, de 720p à 5K (16:9, 16:10, 21:9, 32:9) | Liste de `["nom", largeur, hauteur]`. Au-delà de 3840x2160, Moonlight plafonne sa référence de débit : ces lignes sont signalées `*` et la valeur est un plancher. |
+| `framerates` | `[60, 90, 120, 144, 175]` | Fréquences évaluées. |
 
 ## `[profiles.<nom>]`
 

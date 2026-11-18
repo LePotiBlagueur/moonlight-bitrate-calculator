@@ -10,6 +10,7 @@ from pathlib import Path
 from moonlight_bitrate.config import AppConfig
 from moonlight_bitrate.recap import (
     RENDERERS,
+    best_table,
     SECTIONS,
     build_recap,
     codec_table,
@@ -89,6 +90,19 @@ class TestTables(unittest.TestCase):
                                  ModelConfig(quality=preset))
             self.assertGreater(mode.advised_mbps, previous)
             previous = mode.advised_mbps
+
+    def test_best_table_has_one_row_per_screen_size(self):
+        cfg = AppConfig()
+        table = best_table(300.0, cfg.model)
+        self.assertEqual(len(table.rows), len(cfg.model.resolutions))
+        self.assertEqual([row[1] for row in table.rows],
+                         [f"{w}x{h}" for _, w, h in cfg.model.resolutions])
+
+    def test_above_4k_rows_are_flagged_as_a_floor(self):
+        table = best_table(300.0, AppConfig().model)
+        flagged = [row[0] for row in table.rows if row[0].endswith(" *")]
+        self.assertEqual(flagged, ["4K 16:10 *", "5K2K UW *", "5K *"])
+        self.assertTrue(any("plafonne" in note for note in table.notes))
 
     def test_tight_budget_marks_everything_impossible(self):
         table = matrix_table(2.0, AppConfig().model, plain=False)

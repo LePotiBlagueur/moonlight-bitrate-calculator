@@ -4,12 +4,14 @@ import unittest
 
 from moonlight_bitrate.config import ModelConfig
 from moonlight_bitrate.model import (
+    best_per_resolution,
     build_matrix,
     evaluate_mode,
     framerate_factor,
     link_need,
     max_video_for_budget,
     moonlight_default_mbps,
+    reference_is_clamped,
 )
 
 
@@ -38,9 +40,15 @@ class TestMoonlightDefaults(unittest.TestCase):
         self.assertGreater(factor, 10.0)
         self.assertLess(factor, 20.0)
 
-    def test_above_4k_extrapolates(self):
-        self.assertGreater(moonlight_default_mbps(5120, 2880, 60),
-                           moonlight_default_mbps(3840, 2160, 60))
+    def test_above_4k_is_clamped_like_moonlight(self):
+        """La sentinelle du tableau amont renvoie le dernier facteur (40)."""
+        for w, h in [(3840, 2400), (5120, 2160), (5120, 2880)]:
+            with self.subTest(res=f"{w}x{h}"):
+                self.assertEqual(moonlight_default_mbps(w, h, 60),
+                                 moonlight_default_mbps(3840, 2160, 60))
+                self.assertTrue(reference_is_clamped(w, h))
+        self.assertFalse(reference_is_clamped(3840, 2160))
+        self.assertFalse(reference_is_clamped(5120, 1440))
 
     def test_framerate_is_sublinear_above_60(self):
         self.assertAlmostEqual(framerate_factor(60), 2.0)
@@ -87,3 +95,32 @@ class TestBudget(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestPerResolutionAdvice(unittest.TestCase):
+    """Une recommandation par taille d'écran, jamais une seule ligne globale."""
+
+    def setUp(self):
+        self.m = ModelConfig()
+
+    def test_one_entry_per_resolution_in_order(self):
+        pairs = best_per_resolution(build_matrix(300.0, self.m))
+        self.assertEqual([key for key, _ in pairs],
+                         [tuple(r) for r in self.m.resolutions])
+
+    def test_picks_the_highest_feasible_framerate(self):
+        # Budget large : chaque taille doit atteindre la fréquence maximale.
+        top = max(self.m.framerates)
+        for _, mode in best_per_resolution(build_matrix(10_000.0, self.m)):
+            self.assertIsNotNone(mode)
+            self.assertEqual(mode.fps, top)
+
+    def test_small_budget_keeps_the_rows_but_empties_them(self):
+        pairs = best_per_resolution(build_matrix(12.0, self.m))
+        self.assertEqual(len(pairs), len(self.m.resolutions))
+        self.assertIsNone(pairs[-1][1])        # 5K hors budget
+        self.assertIsNotNone(pairs[0][1])      # 720p tient encore
+
+    def test_requested_framerates_are_covered(self):
+        for fps in (60, 144, 175):
+            self.assertIn(fps, self.m.framerates)

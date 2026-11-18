@@ -55,6 +55,13 @@ moonlight-recap -b 450 \
 `--resolution` et `--fps` sont répétables et **remplacent** les listes de la
 config. Le nom d'affichage se préfixe : `--resolution "UW:3440x1440"`.
 
+Par défaut, les tableaux couvrent 17 tailles d'écran (du 720p à la 5K, en
+16:9, 16:10, 21:9 et 32:9) et cinq fréquences — 60, 90, 120, 144 et 175 fps.
+C'est volontairement large : la section « Mode le plus élevé tenable par
+taille d'écran » donne une ligne par définition, il suffit de lire la sienne.
+Pour un tableau plus court, citez vos modes, ou réduisez `resolutions` et
+`framerates` dans `[model]`.
+
 ## Sans fichier de configuration
 
 ```bash

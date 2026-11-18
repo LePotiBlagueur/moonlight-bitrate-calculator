@@ -19,6 +19,14 @@ _RES_TABLE: list[tuple[int, float]] = [
 ]
 
 
+# Dernière entrée du tableau : au-delà, Moonlight ne prolonge pas la pente.
+# Sa sentinelle {-1, -1} renvoie le facteur précédent (« Never go above the
+# highest resolution entry »), donc la référence plafonne à 40 au-dessus de
+# la 4K. On reproduit ce plafond, et les tableaux signalent les lignes
+# concernées : la valeur y est un plancher, pas un besoin réel.
+TABLE_MAX_PIXELS = _RES_TABLE[-1][0]
+
+
 def resolution_factor(width: int, height: int) -> float:
     pixels = width * height
     if pixels <= _RES_TABLE[0][0]:
@@ -26,9 +34,12 @@ def resolution_factor(width: int, height: int) -> float:
     for (p0, f0), (p1, f1) in zip(_RES_TABLE, _RES_TABLE[1:]):
         if pixels <= p1:
             return f0 + (pixels - p0) * (f1 - f0) / (p1 - p0)
-    # Au-delà de la 4K : on prolonge la dernière pente.
-    (p0, f0), (p1, f1) = _RES_TABLE[-2], _RES_TABLE[-1]
-    return f1 + (pixels - p1) * (f1 - f0) / (p1 - p0)
+    return _RES_TABLE[-1][1]
+
+
+def reference_is_clamped(width: int, height: int) -> bool:
+    """Vrai si Moonlight plafonne sa référence pour cette définition."""
+    return width * height > TABLE_MAX_PIXELS
 
 
 def framerate_factor(fps: int) -> float:
@@ -58,6 +69,7 @@ class ModeTarget:
     verdict: str            # "ok" | "marginal" | "no"
     advised_mbps: float     # débit à saisir dans Moonlight
     headroom: float         # budget / besoin réseau
+    clamped: bool = False   # référence plafonnée par Moonlight (> 4K)
 
     @property
     def pixel_rate(self) -> int:
@@ -114,6 +126,7 @@ def evaluate_mode(name: str, width: int, height: int, fps: int,
         reference_mbps=reference, video_mbps=video, link_mbps=need,
         verdict=verdict, advised_mbps=advised,
         headroom=(budget_mbps / need) if need > 0 else 0.0,
+        clamped=reference_is_clamped(width, height),
     )
 
 
@@ -125,16 +138,49 @@ def build_matrix(budget_mbps: float, m: ModelConfig) -> list[ModeTarget]:
     ]
 
 
-def best_modes(matrix: list[ModeTarget], limit: int = 3) -> list[ModeTarget]:
-    """Modes confortables, classés par charge de pixels décroissante."""
-    feasible = [t for t in matrix if t.verdict == "ok"]
-    return sorted(feasible, key=lambda t: t.pixel_rate, reverse=True)[:limit]
+def best_fps(resolution: tuple[str, int, int], budget_mbps: float,
+             m: ModelConfig, accept_marginal: bool = False) -> ModeTarget | None:
+    """Fréquence la plus haute tenable pour une définition donnée."""
+    name, w, h = resolution
+    allowed = ("ok", "marginal") if accept_marginal else ("ok",)
+    for fps in sorted(m.framerates, reverse=True):
+        mode = evaluate_mode(name, w, h, fps, budget_mbps, m)
+        if mode.verdict in allowed:
+            return mode
+    return None
 
 
-def recommend_codec(advised_mbps: float, width: int, height: int) -> str:
+def best_per_resolution(
+    matrix: list[ModeTarget], accept_marginal: bool = True,
+) -> list[tuple[tuple[str, int, int], ModeTarget | None]]:
+    """Pour chaque taille d'écran de la matrice, le mode le plus élevé tenable.
+
+    L'ordre des définitions est préservé, et une taille hors budget renvoie
+    None plutôt que d'être omise : la ligne doit rester visible.
+    """
+    order: list[tuple[str, int, int]] = []
+    groups: dict[tuple[str, int, int], list[ModeTarget]] = {}
+    for t in matrix:
+        key = (t.name, t.width, t.height)
+        if key not in groups:
+            order.append(key)
+            groups[key] = []
+        groups[key].append(t)
+
+    out = []
+    for key in order:
+        pool = [t for t in groups[key] if t.verdict == "ok"]
+        if not pool and accept_marginal:
+            pool = [t for t in groups[key] if t.verdict == "marginal"]
+        out.append((key, max(pool, key=lambda t: t.fps) if pool else None))
+    return out
+
+
+def recommend_codec_short(advised_mbps: float, width: int, height: int) -> str:
+    """Codec conseillé, en version courte pour une colonne de tableau."""
     pixels = width * height
     if pixels >= 2560 * 1440 or advised_mbps >= 50:
-        return "AV1 si le GPU des deux côtés le gère, sinon HEVC Main"
+        return "AV1 ou HEVC"
     if advised_mbps >= 25:
-        return "HEVC Main (meilleur rapport qualité/débit que H.264)"
-    return "HEVC Main ; H.264 seulement en cas d'incompatibilité"
+        return "HEVC"
+    return "HEVC (H.264 au besoin)"

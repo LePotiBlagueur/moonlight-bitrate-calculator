@@ -66,7 +66,7 @@ class TestEntry(unittest.TestCase):
             code = entry.recap_main(["-b", "300", "--sections", "best",
                                      "--no-color"])
         self.assertEqual(code, 0)
-        self.assertIn("Meilleurs modes", out.getvalue())
+        self.assertIn("par taille d'écran", out.getvalue())
 
 
 if __name__ == "__main__":

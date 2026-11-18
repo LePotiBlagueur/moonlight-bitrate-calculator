@@ -14,18 +14,32 @@ except ModuleNotFoundError:  # pragma: no cover
     tomllib = None  # type: ignore[assignment]
 
 
+# Tailles d'affichage courantes chez les clients Moonlight (téléphones,
+# portables, Steam Deck, moniteurs 16:9, 16:10, 21:9 et 32:9), classées par
+# nombre de pixels croissant — c'est ce qui dicte le débit.
 DEFAULT_RESOLUTIONS: list[tuple[str, int, int]] = [
     ("720p", 1280, 720),
+    ("800p 16:10", 1280, 800),
     ("900p", 1600, 900),
     ("1080p", 1920, 1080),
     ("1200p 16:10", 1920, 1200),
+    ("UW 1080p", 2560, 1080),
     ("1440p", 2560, 1440),
     ("1600p 16:10", 2560, 1600),
     ("UW 1440p", 3440, 1440),
+    ("1800p 16:10", 2880, 1800),
+    ("1800p", 3200, 1800),
+    ("UW 1600p", 3840, 1600),
+    ("SUW 1440p 32:9", 5120, 1440),
     ("4K", 3840, 2160),
+    ("4K 16:10", 3840, 2400),
+    ("5K2K UW", 5120, 2160),
+    ("5K", 5120, 2880),
 ]
 
-DEFAULT_FRAMERATES: list[int] = [60, 90, 120, 144]
+# 60, 144 et 175 Hz sont les fréquences demandées ; 90 et 120 restent dans la
+# liste, utiles pour brider volontairement un lien juste.
+DEFAULT_FRAMERATES: list[int] = [60, 90, 120, 144, 175]
 
 
 @dataclass
