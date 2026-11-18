@@ -5,6 +5,7 @@ import unittest
 from moonlight_bitrate.config import ModelConfig
 from moonlight_bitrate.model import (
     SLIDER_MAX_MBPS,
+    SLIDER_UNLOCKED_MAX_MBPS,
     best_per_resolution,
     build_matrix,
     evaluate_mode,
@@ -14,6 +15,7 @@ from moonlight_bitrate.model import (
     moonlight_default_mbps,
     needs_unlock,
     reference_is_clamped,
+    settable_ceiling,
 )
 
 
@@ -144,3 +146,37 @@ class TestSliderCeiling(unittest.TestCase):
         # Le même mode en qualité par défaut reste saisissable.
         default = evaluate_mode("4K", 3840, 2160, 175, 10_000.0, ModelConfig())
         self.assertFalse(needs_unlock(default.advised_mbps))
+
+
+class TestSettableCeiling(unittest.TestCase):
+    """Le plafond réglable est unique : le lien ne compte pas les pixels."""
+
+    def setUp(self):
+        self.m = ModelConfig()   # FEC 20 %, audio 0.5 Mbps
+
+    def test_slider_binds_on_a_fat_link(self):
+        # 609.6 Mbps de budget laissent 507.6 à la vidéo : le curseur passe
+        # en premier.
+        ceiling, limiter = settable_ceiling(609.6, self.m)
+        self.assertAlmostEqual(ceiling, SLIDER_UNLOCKED_MAX_MBPS)
+        self.assertIn("curseur", limiter)
+
+    def test_link_binds_just_below(self):
+        ceiling, limiter = settable_ceiling(581.8, self.m)
+        self.assertAlmostEqual(ceiling, 484.0)
+        self.assertEqual(limiter, "le lien")
+
+    def test_link_binds_on_a_thin_one(self):
+        ceiling, limiter = settable_ceiling(60.0, self.m)
+        self.assertAlmostEqual(ceiling, 49.5)
+        self.assertEqual(limiter, "le lien")
+
+    def test_locked_slider_caps_at_150(self):
+        ceiling, _ = settable_ceiling(609.6, self.m, unlocked=False)
+        self.assertAlmostEqual(ceiling, SLIDER_MAX_MBPS)
+
+    def test_ceiling_lands_on_a_slider_step(self):
+        for budget in (60.0, 123.4, 581.8):
+            with self.subTest(budget=budget):
+                ceiling, _ = settable_ceiling(budget, self.m)
+                self.assertAlmostEqual(ceiling * 2, round(ceiling * 2))

@@ -16,6 +16,7 @@ from .model import (
     max_video_for_budget,
     needs_unlock,
     recommend_codec_short,
+    settable_ceiling,
     reference_is_clamped,
 )
 
@@ -227,7 +228,10 @@ def matrix_report(matrix: list[ModeTarget], cfg: AppConfig, budget: float,
     print(f"  Budget réseau utilisable : {c.bold}{budget:.1f} Mbps{c.reset} "
           f"→ vidéo max {max_video_for_budget(budget, m):.1f} Mbps "
           f"(FEC {m.fec_overhead * 100:.0f} % + audio {m.audio_mbps:.1f} Mbps déduits)")
-    print(f"  {SLIDER_LINE}\n")
+    print(f"  {SLIDER_LINE}")
+    ceiling, limiter = settable_ceiling(budget, m)
+    print(f"  Débit maximal réglable : {c.bold}{ceiling:.1f} Mbps{c.reset} "
+          f"— limité par {limiter}, quelle que soit la définition\n")
 
     framerates = sorted(m.framerates)
     headers = ["Résolution", "Définition"] + [f"{f} fps" for f in framerates]

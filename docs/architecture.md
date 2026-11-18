@@ -106,6 +106,11 @@ moonlight-qt (`app/gui/SettingsView.qml`) s'arrête à **150 Mbps**, et ne monte
 de 150 sont marquées `†` : le lien les encaisse peut-être, le client ne les
 accepte pas tel quel.
 
+De là le « débit maximal réglable » affiché sous le budget : la plus basse
+des deux limites, ce que le budget réseau laisse à la vidéo et où s'arrête
+le curseur. Il est identique pour toutes les définitions — le lien transporte
+des bits, pas des pixels — et il est arrondi au pas de 0,5 Mbps du curseur.
+
 Deux facteurs s'appliquent ensuite :
 
 - **codec** — H.264 ×1.00, HEVC ×0.75, AV1 ×0.65, à qualité équivalente ;

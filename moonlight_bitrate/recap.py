@@ -21,6 +21,7 @@ from .model import (
     max_video_for_budget,
     needs_unlock,
     recommend_codec_short,
+    settable_ceiling,
     reference_is_clamped,
 )
 from .report import CLAMP_NOTE, SLIDER_NOTE, Palette, _table, align_markers
@@ -256,6 +257,7 @@ def build_recap(cfg: AppConfig, budget: float, capacity: float,
         ("Vidéo maximale", f"{max_video_for_budget(budget, m):.1f} Mbps"),
         ("Curseur Moonlight", f"{SLIDER_MAX_MBPS:.0f} Mbps "
                               f"({SLIDER_UNLOCKED_MAX_MBPS:.0f} si débloqué)"),
+        ("Débit maximal réglable", "%.1f Mbps — limité par %s" % settable_ceiling(budget, m)),
         ("FEC Sunshine", f"{m.fec_overhead * 100:.0f} %"),
         ("Audio réservé", f"{m.audio_mbps:.1f} Mbps"),
         ("Codec", CODEC_LABEL.get(m.codec, m.codec)),

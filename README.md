@@ -84,6 +84,7 @@ moonlight-bitrate --load mesures.json --json       # sortie machine
   Codec HEVC · préréglage « balanced » (×1.00 de la référence Moonlight, ×0.75 pour le codec)
   Budget réseau utilisable : 581.8 Mbps → vidéo max 484.4 Mbps (FEC 20 % + audio 0.5 Mbps déduits)
   Curseur de moonlight-qt (client PC) : 150 Mbps au maximum, 500 en cochant « Unlock bitrate limit (Experimental) »
+  Débit maximal réglable : 484.0 Mbps — limité par le lien, quelle que soit la définition
 
   Résolution     │ Définition │  60 fps │  90 fps │ 120 fps │ 144 fps │ 175 fps
   ───────────────┼────────────┼─────────┼─────────┼─────────┼─────────┼────────

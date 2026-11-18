@@ -44,11 +44,28 @@ def resolution_factor(width: int, height: int) -> float:
 # les autres clients Moonlight n'ont pas été vérifiés.
 SLIDER_MAX_MBPS = 150.0
 SLIDER_UNLOCKED_MAX_MBPS = 500.0
+SLIDER_STEP_MBPS = 0.5
 
 
 def needs_unlock(video_mbps: float) -> bool:
     """Vrai si le débit dépasse le curseur Moonlight non débloqué."""
     return video_mbps > SLIDER_MAX_MBPS
+
+
+def settable_ceiling(budget_mbps: float, m: ModelConfig,
+                     unlocked: bool = True) -> tuple[float, str]:
+    """Débit vidéo le plus haut réellement saisissable, et ce qui le borne.
+
+    Ce plafond ne dépend pas de la définition : le lien transporte des bits,
+    pas des pixels. C'est la plus basse des deux limites — ce que le budget
+    réseau laisse à la vidéo, et où s'arrête le curseur de Moonlight.
+    """
+    link = max_video_for_budget(budget_mbps, m)
+    slider = SLIDER_UNLOCKED_MAX_MBPS if unlocked else SLIDER_MAX_MBPS
+    if slider <= link:
+        return slider, "le curseur débloqué" if unlocked else "le curseur"
+    # Le curseur avance par pas de 0.5 Mbps : on arrondit vers le bas.
+    return math.floor(link / SLIDER_STEP_MBPS) * SLIDER_STEP_MBPS, "le lien"
 
 
 def reference_is_clamped(width: int, height: int) -> bool:
