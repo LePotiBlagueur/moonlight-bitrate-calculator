@@ -11,16 +11,19 @@ from datetime import datetime
 from .config import CODEC_EFFICIENCY, QUALITY_FACTOR, AppConfig, ModelConfig
 from .ladder import DIRECTION_LABEL, NetworkProfile
 from .model import (
+    SLIDER_MAX_MBPS,
+    SLIDER_UNLOCKED_MAX_MBPS,
     ModeTarget,
     best_fps,
     best_per_resolution,
     build_matrix,
     budget_from_capacity,
     max_video_for_budget,
+    needs_unlock,
     recommend_codec_short,
     reference_is_clamped,
 )
-from .report import CLAMP_NOTE, Palette, _table
+from .report import CLAMP_NOTE, SLIDER_NOTE, Palette, _table, align_markers
 
 MARK = {"ok": "✓", "marginal": "~", "no": "✗"}
 CODEC_LABEL = {"h264": "H.264", "hevc": "HEVC", "av1": "AV1"}
@@ -58,8 +61,10 @@ def _cell(t: ModeTarget | None, plain: bool) -> str:
         return ""
     if t.verdict == "no":
         return "—" if plain else "— ✗"
-    mark = MARK[t.verdict]
-    return f"{t.advised_mbps:.0f}" if plain else f"{t.advised_mbps:.0f} {mark}"
+    if plain:
+        return f"{t.advised_mbps:.0f}"
+    flag = " †" if needs_unlock(t.advised_mbps) else ""
+    return f"{t.advised_mbps:.0f} {MARK[t.verdict]}{flag}"
 
 
 def network_table(profile: NetworkProfile) -> Table:
@@ -91,7 +96,7 @@ def network_table(profile: NetworkProfile) -> Table:
         title="Lien mesuré",
         headers=["Sens", "TCP brut (Mbps)", "UDP propre (Mbps)", "Perte (%)",
                  "Gigue (ms)"],
-        rows=rows, aligns="lrrrr", notes=notes,
+        rows=align_markers(rows), aligns="lrrrr", notes=notes,
     )
 
 
@@ -109,13 +114,15 @@ def matrix_table(budget: float, m: ModelConfig, plain: bool) -> Table:
     notes = []
     if not plain:
         notes.append("✓ confortable · ~ limite · ✗ hors budget")
+        if any("†" in cell for row in rows for cell in row[2:]):
+            notes.append(SLIDER_NOTE)
         if clamped:
             notes.append(CLAMP_NOTE)
     return Table(
         title=f"Débit à régler dans Moonlight — {CODEC_LABEL.get(m.codec, m.codec)}, "
               f"préréglage « {m.quality} » (Mbps)",
         headers=["Résolution", "Définition"] + [f"{f} fps" for f in framerates],
-        rows=rows, aligns="ll" + "r" * len(framerates),
+        rows=align_markers(rows), aligns="ll" + "r" * len(framerates),
         notes=notes,
     )
 
@@ -134,14 +141,20 @@ def codec_table(budget: float, m: ModelConfig) -> Table:
         for codec in codecs:
             variant = ModelConfig(**{**m.__dict__, "codec": codec})
             best = best_fps(resolution, budget, variant)
-            row.append(f"{best.fps} fps · {best.advised_mbps:.0f}" if best else "—")
+            if best is None:
+                row.append("—")
+                continue
+            row.append(f"{best.fps} fps · {best.advised_mbps:.0f}"
+                       + (" †" if needs_unlock(best.advised_mbps) else ""))
         rows.append(row)
     return Table(
         title="Mode le plus élevé tenable selon le codec (fps · Mbps)",
         headers=["Résolution", "Définition"] + [CODEC_LABEL[c] for c in codecs],
-        rows=rows, aligns="llrrr",
+        rows=align_markers(rows), aligns="llrrr",
         notes=["Efficacité relative appliquée : " + ", ".join(
             f"{CODEC_LABEL[c]} ×{CODEC_EFFICIENCY[c]:.2f}" for c in codecs)]
+        + ([SLIDER_NOTE] if any("†" in cell for row in rows for cell in row[2:])
+           else [])
         + ([CLAMP_NOTE] if clamped else []),
     )
 
@@ -163,33 +176,37 @@ def quality_table(budget: float, m: ModelConfig) -> Table:
             rows.append([
                 preset, f"×{QUALITY_FACTOR[preset]:.2f}",
                 f"{best.width}x{best.height}", f"{best.fps}",
-                f"{best.advised_mbps:.0f}", f"{best.headroom:.2f}×",
+                f"{best.advised_mbps:.0f}"
+                + (" †" if needs_unlock(best.advised_mbps) else ""),
+                f"{best.headroom:.2f}×",
             ])
         else:
             rows.append([preset, f"×{QUALITY_FACTOR[preset]:.2f}", "—", "—", "—", "—"])
     return Table(
         title=f"Mode maximal selon le préréglage de qualité ({CODEC_LABEL.get(m.codec, m.codec)})",
         headers=["Préréglage", "Facteur", "Résolution", "fps", "Mbps", "Marge"],
-        rows=rows, aligns="llrrrr",
+        rows=align_markers(rows), aligns="llrrrr",
         notes=["Le facteur s'applique à la référence Moonlight : « max » vise une "
-               "qualité nettement supérieure au défaut, « saver » l'allège."],
+               "qualité nettement supérieure au défaut, « saver » l'allège."]
+        + ([SLIDER_NOTE] if any("†" in row[4] for row in rows) else []),
     )
 
 
 def best_table(budget: float, m: ModelConfig) -> Table:
     """Le mode le plus élevé tenable pour chaque taille d'écran."""
-    rows, clamped, marginal = [], False, False
+    rows, clamped, marginal, unlock = [], False, False, False
     for (name, w, h), t in best_per_resolution(build_matrix(budget, m)):
         if t is None:
             rows.append([name, f"{w}x{h}", "—", "—", "—", "hors budget"])
             continue
         clamped = clamped or t.clamped
         marginal = marginal or t.verdict == "marginal"
+        unlock = unlock or needs_unlock(t.advised_mbps)
         rows.append([
             name + (" *" if t.clamped else ""),
             f"{w}x{h}",
             f"{t.fps}" + ("" if t.verdict == "ok" else " ~"),
-            f"{t.advised_mbps:.0f}",
+            f"{t.advised_mbps:.0f}" + (" †" if needs_unlock(t.advised_mbps) else ""),
             f"{t.headroom:.2f}×",
             recommend_codec_short(t.advised_mbps, w, h),
         ])
@@ -197,6 +214,8 @@ def best_table(budget: float, m: ModelConfig) -> Table:
              "et le GPU qui limitent."]
     if marginal:
         notes.append("~ mode limite : tenable, sans marge.")
+    if unlock:
+        notes.append(SLIDER_NOTE)
     if clamped:
         notes.append(CLAMP_NOTE)
     if all(row[2] == "—" for row in rows):
@@ -205,7 +224,7 @@ def best_table(budget: float, m: ModelConfig) -> Table:
         title="Mode le plus élevé tenable par taille d'écran",
         headers=["Résolution", "Définition", "fps max", "Mbps à régler",
                  "Marge", "Codec"],
-        rows=rows, aligns="llrrrl", notes=notes,
+        rows=align_markers(rows), aligns="llrrrl", notes=notes,
     )
 
 
@@ -235,6 +254,8 @@ def build_recap(cfg: AppConfig, budget: float, capacity: float,
         ("Marge de sécurité", f"×{m.safety_margin:.2f}"),
         ("Budget réseau", f"{budget:.1f} Mbps"),
         ("Vidéo maximale", f"{max_video_for_budget(budget, m):.1f} Mbps"),
+        ("Curseur Moonlight", f"{SLIDER_MAX_MBPS:.0f} Mbps "
+                              f"({SLIDER_UNLOCKED_MAX_MBPS:.0f} si débloqué)"),
         ("FEC Sunshine", f"{m.fec_overhead * 100:.0f} %"),
         ("Audio réservé", f"{m.audio_mbps:.1f} Mbps"),
         ("Codec", CODEC_LABEL.get(m.codec, m.codec)),
@@ -285,6 +306,11 @@ def render_text(recap: Recap, palette: Palette) -> str:
     return "\n".join(out)
 
 
+def _clean(row: list[str]) -> list[str]:
+    """Le remplissage ne sert qu'à aligner le tableau texte."""
+    return [cell.strip() for cell in row]
+
+
 def render_markdown(recap: Recap) -> str:
     out = [f"# {recap.title}", "", f"*{recap.subtitle}*", ""]
     out += ["| Paramètre | Valeur |", "|---|---|"]
@@ -295,7 +321,7 @@ def render_markdown(recap: Recap) -> str:
         out.append("|" + "|".join(
             ":--" if a == "l" else "--:" for a in table.aligns) + "|")
         for row in table.rows:
-            out.append("| " + " | ".join(row) + " |")
+            out.append("| " + " | ".join(_clean(row)) + " |")
         for note in table.notes:
             out += ["", f"> {note}"]
     if recap.footer:
@@ -315,7 +341,7 @@ def render_csv(recap: Recap) -> str:
         writer.writerow([])
         writer.writerow([table.title])
         writer.writerow(table.headers)
-        writer.writerows(table.rows)
+        writer.writerows(_clean(row) for row in table.rows)
         for note in table.notes:
             writer.writerow([note])
     return buf.getvalue()
@@ -351,11 +377,13 @@ footer{margin-top:36px;color:var(--muted);font-size:.85rem}
 
 def _html_cell(text: str) -> str:
     escaped = html.escape(text)
-    if text.endswith("✓"):
+    # « 154 ✓ † » porte le marqueur après le verdict : on cherche le symbole
+    # n'importe où dans la case, pas seulement en fin de chaîne.
+    if "✓" in text:
         return f'<span class="ok">{escaped}</span>'
-    if text.endswith("~"):
+    if "~" in text:
         return f'<span class="warn">{escaped}</span>'
-    if text.endswith("✗") or text == "—":
+    if "✗" in text or text == "—":
         return f'<span class="no">{escaped}</span>'
     return escaped
 
@@ -381,7 +409,7 @@ def render_html(recap: Recap) -> str:
         parts.append("</tr></thead><tbody>")
         for row in table.rows:
             parts.append("<tr>")
-            for i, cell in enumerate(row):
+            for i, cell in enumerate(_clean(row)):
                 cls = ' class="num"' if table.aligns[i] == "r" else ""
                 parts.append(f"<td{cls}>{_html_cell(cell)}</td>")
             parts.append("</tr>")
@@ -404,7 +432,8 @@ def render_json(recap: Recap) -> str:
         "generated_at": recap.subtitle,
         "meta": dict(recap.meta),
         "tables": [{
-            "title": t.title, "headers": t.headers, "rows": t.rows,
+            "title": t.title, "headers": t.headers,
+            "rows": [_clean(row) for row in t.rows],
             "notes": t.notes,
         } for t in recap.tables],
         "footer": recap.footer,

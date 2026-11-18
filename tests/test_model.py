@@ -4,6 +4,7 @@ import unittest
 
 from moonlight_bitrate.config import ModelConfig
 from moonlight_bitrate.model import (
+    SLIDER_MAX_MBPS,
     best_per_resolution,
     build_matrix,
     evaluate_mode,
@@ -11,6 +12,7 @@ from moonlight_bitrate.model import (
     link_need,
     max_video_for_budget,
     moonlight_default_mbps,
+    needs_unlock,
     reference_is_clamped,
 )
 
@@ -124,3 +126,21 @@ class TestPerResolutionAdvice(unittest.TestCase):
     def test_requested_framerates_are_covered(self):
         for fps in (60, 144, 175):
             self.assertIn(fps, self.m.framerates)
+
+
+class TestSliderCeiling(unittest.TestCase):
+    """Le curseur de Moonlight s'arrête à 150 Mbps sans déblocage."""
+
+    def test_threshold(self):
+        self.assertFalse(needs_unlock(SLIDER_MAX_MBPS))
+        self.assertTrue(needs_unlock(SLIDER_MAX_MBPS + 0.1))
+
+    def test_4k_at_max_quality_needs_the_unlock(self):
+        from moonlight_bitrate.model import evaluate_mode
+
+        mode = evaluate_mode("4K", 3840, 2160, 175, 10_000.0,
+                             ModelConfig(quality="max"))
+        self.assertTrue(needs_unlock(mode.advised_mbps))
+        # Le même mode en qualité par défaut reste saisissable.
+        default = evaluate_mode("4K", 3840, 2160, 175, 10_000.0, ModelConfig())
+        self.assertFalse(needs_unlock(default.advised_mbps))

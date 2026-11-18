@@ -100,6 +100,12 @@ reproduit ce plafond plutôt que de prolonger la pente — c'est bien ce que
 Moonlight proposera — mais les lignes concernées sont marquées `*` dans les
 tableaux : la valeur y est un plancher, pas le besoin réel d'une 5K.
 
+Une limite n'a rien à voir avec le réseau : le curseur de débit de
+moonlight-qt (`app/gui/SettingsView.qml`) s'arrête à **150 Mbps**, et ne monte
+à 500 que si la préférence `unlockBitrate` est active. Les valeurs au-dessus
+de 150 sont marquées `†` : le lien les encaisse peut-être, le client ne les
+accepte pas tel quel.
+
 Deux facteurs s'appliquent ensuite :
 
 - **codec** — H.264 ×1.00, HEVC ×0.75, AV1 ×0.65, à qualité équivalente ;

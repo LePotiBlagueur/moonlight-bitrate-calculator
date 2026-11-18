@@ -37,6 +37,20 @@ def resolution_factor(width: int, height: int) -> float:
     return _RES_TABLE[-1][1]
 
 
+# Curseur de débit de moonlight-qt (app/gui/SettingsView.qml) : de 0.5 à
+# 150 Mbps par pas de 0.5, et jusqu'à 500 Mbps quand la préférence
+# unlockBitrate est active — la case « Unlock bitrate limit (Experimental) »,
+# dont l'infobulle réserve l'usage à un lien Ethernet. Valeurs du client PC ;
+# les autres clients Moonlight n'ont pas été vérifiés.
+SLIDER_MAX_MBPS = 150.0
+SLIDER_UNLOCKED_MAX_MBPS = 500.0
+
+
+def needs_unlock(video_mbps: float) -> bool:
+    """Vrai si le débit dépasse le curseur Moonlight non débloqué."""
+    return video_mbps > SLIDER_MAX_MBPS
+
+
 def reference_is_clamped(width: int, height: int) -> bool:
     """Vrai si Moonlight plafonne sa référence pour cette définition."""
     return width * height > TABLE_MAX_PIXELS

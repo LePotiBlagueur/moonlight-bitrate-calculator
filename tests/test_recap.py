@@ -20,7 +20,7 @@ from moonlight_bitrate.recap import (
 )
 from moonlight_bitrate.recap_cli import apply_overrides, build_parser, main
 from moonlight_bitrate.recap_cli import resolve_source
-from moonlight_bitrate.report import Logger, Palette
+from moonlight_bitrate.report import SLIDER_NOTE, Logger, Palette
 from tests.test_cli import sample_profile
 
 
@@ -103,6 +103,25 @@ class TestTables(unittest.TestCase):
         flagged = [row[0] for row in table.rows if row[0].endswith(" *")]
         self.assertEqual(flagged, ["4K 16:10 *", "5K2K UW *", "5K *"])
         self.assertTrue(any("plafonne" in note for note in table.notes))
+
+    def test_cells_above_the_slider_are_flagged(self):
+        from moonlight_bitrate.config import ModelConfig
+
+        model = ModelConfig(quality="max")
+        table = matrix_table(10_000.0, model, plain=False)
+        flagged = [cell for row in table.rows for cell in row[2:] if "†" in cell]
+        self.assertTrue(flagged, "4K @ 175 en qualité max dépasse 150 Mbps")
+        self.assertIn(SLIDER_NOTE, table.notes)
+        # Au débit par défaut, rien ne dépasse : pas de note parasite.
+        quiet = matrix_table(10_000.0, ModelConfig(), plain=False)
+        self.assertFalse([c for row in quiet.rows for c in row[2:] if "†" in c])
+        self.assertNotIn(SLIDER_NOTE, quiet.notes)
+
+    def test_plain_mode_drops_the_slider_marker(self):
+        from moonlight_bitrate.config import ModelConfig
+
+        table = matrix_table(10_000.0, ModelConfig(quality="max"), plain=True)
+        self.assertFalse([c for row in table.rows for c in row[2:] if "†" in c])
 
     def test_tight_budget_marks_everything_impossible(self):
         table = matrix_table(2.0, AppConfig().model, plain=False)

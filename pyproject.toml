@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "moonlight-bitrate-calculator"
-version = "2.2.0"
+version = "2.3.0"
 description = "Mesure UDP du lien Sunshine → Moonlight et calcul du débit optimal par résolution"
 readme = "README.md"
 requires-python = ">=3.11"

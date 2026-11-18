@@ -9,13 +9,44 @@ from .config import CODEC_EFFICIENCY, QUALITY_FACTOR, AppConfig
 from .iperf import UdpTrial
 from .ladder import DIRECTION_LABEL, DirectionProfile, NetworkProfile
 from .model import (
+    SLIDER_MAX_MBPS,
+    SLIDER_UNLOCKED_MAX_MBPS,
     ModeTarget,
     best_per_resolution,
     max_video_for_budget,
+    needs_unlock,
     recommend_codec_short,
     reference_is_clamped,
 )
 
+
+SLIDER_LINE = (
+    f"Curseur de moonlight-qt (client PC) : {SLIDER_MAX_MBPS:.0f} Mbps au "
+    f"maximum, {SLIDER_UNLOCKED_MAX_MBPS:.0f} en cochant « Unlock bitrate "
+    f"limit (Experimental) »"
+)
+
+SLIDER_NOTE = (
+    f"† au-delà de {SLIDER_MAX_MBPS:.0f} Mbps : valeur non saisissable tant "
+    f"que la case « Unlock bitrate limit (Experimental) » n'est pas cochée."
+)
+
+
+def align_markers(rows: list[list[str]]) -> list[list[str]]:
+    """Dans chaque colonne qui porte un « † », aligne les autres cases.
+
+    Le marqueur occupe deux caractères ; sans ce rattrapage, il décalerait
+    sa case et les ✓ de la colonne ne seraient plus alignés. Les colonnes
+    sans marqueur sont laissées telles quelles.
+    """
+    for col in range(max((len(row) for row in rows), default=0)):
+        cells = [row for row in rows if col < len(row)]
+        if not any("†" in row[col] for row in cells):
+            continue
+        for row in cells:
+            if row[col] and "†" not in row[col]:
+                row[col] += "  "
+    return rows
 
 CLAMP_NOTE = (
     "* au-delà de la 4K, Moonlight plafonne sa référence de débit : "
@@ -176,11 +207,12 @@ def network_report(profile: NetworkProfile, log: Logger) -> None:
 
 
 def _verdict_cell(t: ModeTarget, c: Palette) -> str:
-    if t.verdict == "ok":
-        return f"{c.green}{t.advised_mbps:5.0f} ✓{c.reset}"
-    if t.verdict == "marginal":
-        return f"{c.yellow}{t.advised_mbps:5.0f} ~{c.reset}"
-    return f"{c.dim}    — ✗{c.reset}"
+    if t.verdict == "no":
+        return f"{c.dim}    — ✗{c.reset}"
+    color = c.green if t.verdict == "ok" else c.yellow
+    mark = "✓" if t.verdict == "ok" else "~"
+    cell = f"{color}{t.advised_mbps:5.0f} {mark}{c.reset}"
+    return cell + (" †" if needs_unlock(t.advised_mbps) else "")
 
 
 def matrix_report(matrix: list[ModeTarget], cfg: AppConfig, budget: float,
@@ -194,7 +226,8 @@ def matrix_report(matrix: list[ModeTarget], cfg: AppConfig, budget: float,
           + (" · 4:4:4" if m.yuv444 else "") + (" · HDR" if m.hdr else ""))
     print(f"  Budget réseau utilisable : {c.bold}{budget:.1f} Mbps{c.reset} "
           f"→ vidéo max {max_video_for_budget(budget, m):.1f} Mbps "
-          f"(FEC {m.fec_overhead * 100:.0f} % + audio {m.audio_mbps:.1f} Mbps déduits)\n")
+          f"(FEC {m.fec_overhead * 100:.0f} % + audio {m.audio_mbps:.1f} Mbps déduits)")
+    print(f"  {SLIDER_LINE}\n")
 
     framerates = sorted(m.framerates)
     headers = ["Résolution", "Définition"] + [f"{f} fps" for f in framerates]
@@ -210,10 +243,12 @@ def matrix_report(matrix: list[ModeTarget], cfg: AppConfig, budget: float,
             t = by_key.get((w, h, fps))
             row.append(_verdict_cell(t, c) if t else "")
         rows.append(row)
-    print(_table(headers, rows, aligns="ll" + "r" * len(framerates)))
+    print(_table(headers, align_markers(rows), aligns="ll" + "r" * len(framerates)))
     print(f"\n  {c.green}✓{c.reset} confortable   "
           f"{c.yellow}~{c.reset} limite (micro-saccades possibles)   "
           f"{c.dim}✗{c.reset} au-delà du lien")
+    if any(needs_unlock(t.advised_mbps) for t in matrix if t.verdict != "no"):
+        print(f"  {c.dim}{SLIDER_NOTE}{c.reset}")
     if clamped:
         print(f"  {c.dim}{CLAMP_NOTE}{c.reset}")
 
@@ -257,30 +292,34 @@ def recommendation(matrix: list[ModeTarget], log: Logger) -> None:
         )
         return
 
-    rows, clamped, marginal = [], False, False
+    rows, clamped, marginal, unlock = [], False, False, False
     for (name, w, h), t in pairs:
         if t is None:
             rows.append([name, f"{w}x{h}", "—", "—", "—", "hors budget"])
             continue
         clamped = clamped or t.clamped
         marginal = marginal or t.verdict == "marginal"
+        unlock = unlock or needs_unlock(t.advised_mbps)
         mark = "" if t.verdict == "ok" else " ~"
         rows.append([
             name + (" *" if t.clamped else ""),
             f"{w}x{h}",
             f"{t.fps}{mark}",
-            f"{c.bold}{t.advised_mbps:.0f}{c.reset}",
+            f"{c.bold}{t.advised_mbps:.0f}{c.reset}"
+            + (" †" if needs_unlock(t.advised_mbps) else ""),
             f"{t.headroom:.2f}×",
             recommend_codec_short(t.advised_mbps, w, h),
         ])
     print(_table(
         ["Résolution", "Définition", "fps max", "Mbps à régler", "Marge", "Codec"],
-        rows, aligns="llrrrl",
+        align_markers(rows), aligns="llrrrl",
     ))
     print(f"\n  {c.dim}Prenez la ligne de votre écran : au-delà du lien, ce sont "
           f"la dalle et le GPU qui limitent.{c.reset}")
     if marginal:
         print(f"  {c.dim}~ mode limite : tenable, sans marge.{c.reset}")
+    if unlock:
+        print(f"  {c.dim}{SLIDER_NOTE}{c.reset}")
     if clamped:
         print(f"  {c.dim}{CLAMP_NOTE}{c.reset}")
 
